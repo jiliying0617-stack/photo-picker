@@ -399,9 +399,10 @@ function App() {
               // 处理占位符
               if (!photo) {
                 return (
-                  <div key={`placeholder-${idx}`} className="neu-concave rounded-2xl overflow-hidden opacity-30">
-                    <div className="aspect-square flex items-center justify-center">
-                      <div className="text-gray-400 text-sm">无此文件</div>
+                  <div key={`placeholder-${idx}`} className="neu-card rounded-2xl overflow-hidden">
+                    <div className="aspect-square flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 neu-concave">
+                      <div className="text-6xl mb-3 opacity-20">📷</div>
+                      <div className="text-gray-400 text-xs font-medium">此文件夹无此图片</div>
                     </div>
                   </div>
                 );
