@@ -97,7 +97,10 @@ const usePhotoStore = create((set, get) => ({
     const photos = get().photos;
     const folderMap = get().folderMap;
     const photo = photos.find(p => p.id === photoId);
-    if (!photo) return;
+    if (!photo) {
+      console.warn(`Photo not found: ${photoId}`);
+      return;
+    }
 
     // 更新图片分类
     const updatedPhotos = photos.map(p =>
@@ -126,6 +129,46 @@ const usePhotoStore = create((set, get) => ({
 
     // 保存到 localStorage
     saveCategories(categories);
+  },
+
+  // 批量设置分类 - 性能优化版本 O(n) 而不是 O(n²)
+  setCategoryBatch: (photoIds, category) => {
+    if (!photoIds || photoIds.length === 0) return;
+
+    const photoIdSet = new Set(photoIds); // O(1) 查找
+    const photos = get().photos;
+    const folderMap = get().folderMap;
+    const categories = { ...get().categories };
+
+    // 单次遍历更新所有图片 - O(n)
+    const updatedPhotos = photos.map(p => {
+      if (photoIdSet.has(p.id)) {
+        // 更新分类标记映射
+        if (category) {
+          categories[p.path] = category;
+        } else {
+          delete categories[p.path];
+        }
+        return { ...p, category };
+      }
+      return p;
+    });
+
+    // 更新 folderMap
+    const newFolderMap = {};
+    Object.keys(folderMap).forEach(folder => {
+      newFolderMap[folder] = folderMap[folder].map(p => {
+        if (photoIdSet.has(p.id)) {
+          return { ...p, category };
+        }
+        return p;
+      });
+    });
+
+    set({ photos: updatedPhotos, folderMap: newFolderMap, categories });
+    saveCategories(categories);
+
+    console.log(`✓ 批量更新 ${photoIds.length} 张图片的分类`);
   },
 
   setColumns: (columns) => {

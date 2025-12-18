@@ -10,6 +10,7 @@ function App() {
   const folderMap = usePhotoStore((state) => state.folderMap);
   const columns = usePhotoStore((state) => state.columns);
   const setCategory = usePhotoStore((state) => state.setCategory);
+  const setCategoryBatch = usePhotoStore((state) => state.setCategoryBatch);
   const selectedPhotoId = usePhotoStore((state) => state.selectedPhotoId);
   const setSelectedPhotoId = usePhotoStore((state) => state.setSelectedPhotoId);
 
@@ -186,9 +187,14 @@ function App() {
     };
   }, []);
 
-  // 键盘快捷键 - 极速打标模式
+  // 键盘快捷键 - 极速打标模式（性能优化版）
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // 防止干扰表单输入
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
       // 极速打标：如果有框选的图片，给所有框选图片打标签
       const targetPhotos = selectedPhotos.length > 0
         ? selectedPhotos
@@ -203,16 +209,22 @@ function App() {
 
       if (targetPhotos.length === 0) return;
 
-      // 批量打标签
+      // 批量打标签 - 使用批量更新方法优化性能
       const batchSetCategory = (category) => {
         e.preventDefault();
-        targetPhotos.forEach(photoId => {
-          setCategory(photoId, category);
-        });
+
+        // 性能优化：批量更新而不是循环调用
+        if (targetPhotos.length > 1) {
+          setCategoryBatch(targetPhotos, category);
+        } else {
+          setCategory(targetPhotos[0], category);
+        }
+
         // 清除框选
         if (selectedPhotos.length > 0) {
           setSelectedPhotos([]);
         }
+
         // 如果是单张图片，移动到下一张
         if (targetPhotos.length === 1) {
           moveToNext();
@@ -226,13 +238,7 @@ function App() {
       } else if (e.key === '3') {
         batchSetCategory('wrong');
       } else if (e.key === '0' || e.key === 'x' || e.key === 'X') {
-        e.preventDefault();
-        targetPhotos.forEach(photoId => {
-          setCategory(photoId, null);
-        });
-        if (selectedPhotos.length > 0) {
-          setSelectedPhotos([]);
-        }
+        batchSetCategory(null);
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         moveToPrev();
@@ -256,7 +262,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedPhotoId, selectedPhotos, filteredPhotos, setCategory, setSelectedPhotoId]);
+  }, [selectedPhotoId, selectedPhotos, filteredPhotos, setCategory, setCategoryBatch, setSelectedPhotoId]);
 
   // 检测是否有分类数据但缺少图片文件
   const hasDataButNoImages = photos.length > 0 && photos.every(p => !p.file && !p.thumbnailUrl);
