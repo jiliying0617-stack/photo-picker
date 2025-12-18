@@ -40,7 +40,7 @@ function App() {
     });
   }, [photos, filter]);
 
-  // 对比模式下的图片排列 - 优化：利用 folderMap，减少遍历
+  // 对比模式下的图片排列 - 按选择顺序排列
   const displayPhotos = useMemo(() => {
     if (isCompareMode) {
       // 利用 folderMap 快速查找，避免 O(n²) 遍历
@@ -57,19 +57,30 @@ function App() {
           if (filter.category && p.category !== filter.category) return false;
           return true;
         });
+        // 保持文件夹内部的顺序（不排序）
         return filtered.sort((a, b) => a.name.localeCompare(b.name));
       });
 
-      // 收集所有文件名
-      const allNames = new Set();
-      folderPhotoGroups.forEach(group => {
-        group.forEach(p => allNames.add(p.name));
-      });
-      const sortedNames = Array.from(allNames).sort();
+      // 使用第一个文件夹的图片顺序作为基准（不自动排序）
+      const baseGroup = folderPhotoGroups[0] || [];
+      const baseNames = baseGroup.map(p => p.name);
 
-      // 构建对比列表 - 每个文件名在所有文件夹中对齐
+      // 收集其他文件夹中的额外文件名
+      const additionalNames = new Set();
+      folderPhotoGroups.slice(1).forEach(group => {
+        group.forEach(p => {
+          if (!baseNames.includes(p.name)) {
+            additionalNames.add(p.name);
+          }
+        });
+      });
+
+      // 最终顺序：基准文件夹的顺序 + 其他文件夹的额外图片
+      const orderedNames = [...baseNames, ...Array.from(additionalNames).sort()];
+
+      // 构建对比列表 - 按照选定的顺序对齐
       const alignedPhotos = [];
-      sortedNames.forEach(name => {
+      orderedNames.forEach(name => {
         folderPhotoGroups.forEach(group => {
           const photo = group.find(p => p.name === name);
           alignedPhotos.push(photo || null); // null 作为占位符
