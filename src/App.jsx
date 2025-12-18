@@ -47,13 +47,20 @@ function App() {
       const folderPhotoGroups = selectedFolders.map(folderPath => {
         const photosInFolder = [];
         // 查找该文件夹及其子文件夹的所有图片
-        // 修复：使用 endsWith 或 includes 来匹配路径
+        // 修复：精确匹配路径，避免误匹配
         Object.keys(folderMap).forEach(mapFolder => {
           // 兼容相对路径和绝对路径
-          if (mapFolder.endsWith(folderPath) || mapFolder.includes(folderPath)) {
+          // 确保是完整路径匹配：以 / 或路径分隔符结尾
+          const normalizedMapFolder = mapFolder.replace(/\\/g, '/');
+          const normalizedFolderPath = folderPath.replace(/\\/g, '/');
+
+          if (normalizedMapFolder === normalizedFolderPath ||
+              normalizedMapFolder.endsWith('/' + normalizedFolderPath) ||
+              normalizedMapFolder.endsWith(normalizedFolderPath)) {
             photosInFolder.push(...folderMap[mapFolder]);
           }
         });
+
         // 应用过滤器
         const filtered = photosInFolder.filter(p => {
           if (filter.category && p.category !== filter.category) return false;
