@@ -47,8 +47,10 @@ function App() {
       const folderPhotoGroups = selectedFolders.map(folderPath => {
         const photosInFolder = [];
         // 查找该文件夹及其子文件夹的所有图片
+        // 修复：使用 endsWith 或 includes 来匹配路径
         Object.keys(folderMap).forEach(mapFolder => {
-          if (mapFolder.startsWith(folderPath)) {
+          // 兼容相对路径和绝对路径
+          if (mapFolder.endsWith(folderPath) || mapFolder.includes(folderPath)) {
             photosInFolder.push(...folderMap[mapFolder]);
           }
         });
