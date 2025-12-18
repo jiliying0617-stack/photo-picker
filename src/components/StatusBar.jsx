@@ -51,12 +51,15 @@ function StatusBar() {
 
         {/* 快捷键提示 */}
         <div className="text-xs text-gray-400 font-light flex items-center gap-3">
-          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">1</kbd>
-          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">2</kbd>
-          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">3</kbd>
+          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">A</kbd>
+          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">S</kbd>
+          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">D</kbd>
           <span className="text-gray-400">·</span>
-          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">0</kbd>
+          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">X</kbd>
           <span>取消</span>
+          <span className="text-gray-400">·</span>
+          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">←→</kbd>
+          <span>切换</span>
         </div>
       </div>
     </div>

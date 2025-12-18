@@ -85,16 +85,16 @@ function LightboxPreview({ photos, initialIndex, onClose, allPhotos, onGroupChan
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         setCurrentIndex(prev => Math.min(photos.length - 1, prev + 1));
-      } else if (e.key === '1') {
+      } else if (e.key === 'a' || e.key === 'A') {
         e.preventDefault();
         handleCategoryAll('correct');
-      } else if (e.key === '2') {
+      } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
         handleCategoryAll('medium');
-      } else if (e.key === '3') {
+      } else if (e.key === 'd' || e.key === 'D') {
         e.preventDefault();
         handleCategoryAll('wrong');
-      } else if (e.key === '0') {
+      } else if (e.key === '0' || e.key === 'x' || e.key === 'X') {
         e.preventDefault();
         handleCategoryAll(null);
       } else if (e.key === 'r' || e.key === 'R') {

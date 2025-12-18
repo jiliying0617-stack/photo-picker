@@ -103,20 +103,10 @@ function FolderPanel({ onFilterChange, onSelectedFoldersChange }) {
     setExpandedFolders(newExpanded);
   };
 
-  // 更新过滤
+  // 更新过滤 - 简化：传递数据而不是函数
   const updateFilter = (selected) => {
     if (!onFilterChange) return;
-
-    if (selected.length === 0) {
-      onFilterChange(() => null);
-    } else {
-      onFilterChange(() => (photo) => {
-        const pathParts = photo.path.split('/');
-        pathParts.pop(); // 移除文件名
-        const photoFolderPath = pathParts.join('/');
-        return selected.some(sel => photoFolderPath.startsWith(sel));
-      });
-    }
+    onFilterChange({ category: null, folders: selected });
   };
 
   // 渲染文件夹树

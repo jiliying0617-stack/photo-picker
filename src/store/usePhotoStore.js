@@ -35,9 +35,30 @@ function saveCategories(categories) {
   }
 }
 
+// 提取文件夹路径的辅助函数
+function getFolderPath(photoPath) {
+  const parts = photoPath.split('/');
+  parts.pop(); // 移除文件名
+  return parts.join('/');
+}
+
+// 构建文件夹映射表
+function buildFolderMap(photos) {
+  const folderMap = {};
+  photos.forEach(photo => {
+    const folder = getFolderPath(photo.path);
+    if (!folderMap[folder]) {
+      folderMap[folder] = [];
+    }
+    folderMap[folder].push(photo);
+  });
+  return folderMap;
+}
+
 const usePhotoStore = create((set, get) => ({
   // State
   photos: [],
+  folderMap: {}, // { '/folder/path': [photo1, photo2] }
   columns: loadColumns(),
   selectedPhotoId: null,
   categories: loadCategories(), // { path: category }
@@ -50,7 +71,11 @@ const usePhotoStore = create((set, get) => ({
       ...photo,
       category: categories[photo.path] || photo.category || null
     }));
-    set({ photos: photosWithCategories });
+
+    // 构建文件夹映射
+    const folderMap = buildFolderMap(photosWithCategories);
+
+    set({ photos: photosWithCategories, folderMap });
     console.log(`✓ 加载了 ${photos.length} 张图片,恢复了 ${Object.keys(categories).length} 个分类标记`);
   },
 
@@ -61,11 +86,16 @@ const usePhotoStore = create((set, get) => ({
       category: categories[photo.path] || photo.category || null
     }));
     const updatedPhotos = [...get().photos, ...photosWithCategories];
-    set({ photos: updatedPhotos });
+
+    // 重建文件夹映射
+    const folderMap = buildFolderMap(updatedPhotos);
+
+    set({ photos: updatedPhotos, folderMap });
   },
 
   setCategory: (photoId, category) => {
     const photos = get().photos;
+    const folderMap = get().folderMap;
     const photo = photos.find(p => p.id === photoId);
     if (!photo) return;
 
@@ -73,7 +103,17 @@ const usePhotoStore = create((set, get) => ({
     const updatedPhotos = photos.map(p =>
       p.id === photoId ? { ...p, category } : p
     );
-    set({ photos: updatedPhotos });
+
+    // 增量更新 folderMap - 只更新受影响的文件夹
+    const folder = getFolderPath(photo.path);
+    const newFolderMap = { ...folderMap };
+    if (newFolderMap[folder]) {
+      newFolderMap[folder] = newFolderMap[folder].map(p =>
+        p.id === photoId ? { ...p, category } : p
+      );
+    }
+
+    set({ photos: updatedPhotos, folderMap: newFolderMap });
 
     // 更新分类标记映射
     const categories = { ...get().categories };
@@ -97,7 +137,7 @@ const usePhotoStore = create((set, get) => ({
   setSelectedPhotoId: (photoId) => set({ selectedPhotoId: photoId }),
 
   clearPhotos: () => {
-    set({ photos: [], selectedPhotoId: null });
+    set({ photos: [], folderMap: {}, selectedPhotoId: null });
     console.log('✓ 清空图片列表 (分类标记已保留)');
   },
 

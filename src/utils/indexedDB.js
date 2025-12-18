@@ -81,38 +81,58 @@ export async function savePhotoToDB(photo) {
 }
 
 // Save multiple photos in batch with memory optimization
+// 优化：并行写入而不是串行，提升性能
 export async function savePhotosToDB(photos, onProgress) {
   const total = photos.length;
   let saved = 0;
   let skipped = 0;
-  const BATCH_SIZE = 50; // 每批保存50张图片
+  const CHUNK_SIZE = 10; // 每批并行保存10张图片
 
   console.log(`[IndexedDB] 开始保存 ${total} 张图片...`);
 
-  for (let i = 0; i < photos.length; i++) {
-    const photo = photos[i];
+  // 分块并行处理
+  for (let i = 0; i < photos.length; i += CHUNK_SIZE) {
+    const chunk = photos.slice(i, i + CHUNK_SIZE);
 
-    if (photo.file) {
-      try {
-        await savePhotoToDB(photo);
-        saved++;
-      } catch (error) {
-        console.error(`保存图片失败 [${i + 1}/${total}]:`, photo.name, error);
+    // 并行保存这一批图片
+    const results = await Promise.allSettled(
+      chunk.map(async (photo) => {
+        if (!photo.file) {
+          return { status: 'skipped' };
+        }
+        try {
+          await savePhotoToDB(photo);
+          return { status: 'saved' };
+        } catch (error) {
+          console.error(`保存图片失败:`, photo.name, error);
+          return { status: 'failed' };
+        }
+      })
+    );
+
+    // 统计结果
+    results.forEach(result => {
+      if (result.status === 'fulfilled') {
+        if (result.value.status === 'saved') {
+          saved++;
+        } else {
+          skipped++;
+        }
+      } else {
         skipped++;
       }
-    } else {
-      skipped++;
-    }
+    });
 
-    // 每处理 BATCH_SIZE 张图片后,暂停一下让浏览器释放内存
-    if ((saved + skipped) % BATCH_SIZE === 0) {
-      console.log(`[IndexedDB] 进度: ${saved + skipped}/${total} (${Math.round((saved + skipped) / total * 100)}%)`);
-      // 使用 setTimeout 让浏览器有机会释放内存和渲染
-      await new Promise(resolve => setTimeout(resolve, 10));
-    }
+    const progress = saved + skipped;
+    console.log(`[IndexedDB] 进度: ${progress}/${total} (${Math.round(progress / total * 100)}%)`);
 
     if (onProgress) {
-      onProgress({ current: saved + skipped, total });
+      onProgress({ current: progress, total });
+    }
+
+    // 让浏览器有机会渲染
+    if (i + CHUNK_SIZE < photos.length) {
+      await new Promise(resolve => setTimeout(resolve, 5));
     }
   }
 

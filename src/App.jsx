@@ -7,38 +7,56 @@ import LightboxPreview from './components/LightboxPreview';
 
 function App() {
   const photos = usePhotoStore((state) => state.photos);
+  const folderMap = usePhotoStore((state) => state.folderMap);
   const columns = usePhotoStore((state) => state.columns);
   const setCategory = usePhotoStore((state) => state.setCategory);
   const selectedPhotoId = usePhotoStore((state) => state.selectedPhotoId);
   const setSelectedPhotoId = usePhotoStore((state) => state.setSelectedPhotoId);
 
   const [displayCount, setDisplayCount] = useState(100);
-  const [filterFn, setFilterFn] = useState(() => null);
+  const [filter, setFilter] = useState({ category: null, folders: [] }); // 简化：用对象代替函数
   const [selectedFolders, setSelectedFolders] = useState([]);
   const [selectedPhotos, setSelectedPhotos] = useState([]); // 框选的图片
   const [isSelecting, setIsSelecting] = useState(false); // 是否处于框选模式
   const [previewPhotos, setPreviewPhotos] = useState(null); // 预览的图片列表
   const [isDragging, setIsDragging] = useState(false); // 是否正在拖放
+  const [objectUrls, setObjectUrls] = useState(new Map()); // 管理 Object URLs 生命周期
 
   // 是否为对比模式 (2-8个文件夹)
   const isCompareMode = selectedFolders.length >= 2 && selectedFolders.length <= 8;
   const compareColumns = isCompareMode ? selectedFolders.length : columns;
 
-  // 过滤后的图片列表
-  const filteredPhotos = filterFn ? photos.filter(filterFn) : photos;
+  // 过滤后的图片列表 - 简化：直接在这里过滤，不存函数
+  const filteredPhotos = useMemo(() => {
+    return photos.filter(p => {
+      if (filter.category && p.category !== filter.category) return false;
+      if (filter.folders && filter.folders.length > 0) {
+        const photoFolder = p.path.split('/').slice(0, -1).join('/');
+        if (!filter.folders.some(f => photoFolder.startsWith(f))) return false;
+      }
+      return true;
+    });
+  }, [photos, filter]);
 
-  // 对比模式下的图片排列 (使用 useMemo 缓存)
+  // 对比模式下的图片排列 - 优化：利用 folderMap，减少遍历
   const displayPhotos = useMemo(() => {
     if (isCompareMode) {
-      // 按文件夹分组
-      const folderPhotoGroups = selectedFolders.map(folderPath =>
-        filteredPhotos.filter(p => {
-          const pathParts = p.path.split('/');
-          pathParts.pop();
-          const photoFolderPath = pathParts.join('/');
-          return photoFolderPath.startsWith(folderPath);
-        }).sort((a, b) => a.name.localeCompare(b.name))
-      );
+      // 利用 folderMap 快速查找，避免 O(n²) 遍历
+      const folderPhotoGroups = selectedFolders.map(folderPath => {
+        const photosInFolder = [];
+        // 查找该文件夹及其子文件夹的所有图片
+        Object.keys(folderMap).forEach(mapFolder => {
+          if (mapFolder.startsWith(folderPath)) {
+            photosInFolder.push(...folderMap[mapFolder]);
+          }
+        });
+        // 应用过滤器
+        const filtered = photosInFolder.filter(p => {
+          if (filter.category && p.category !== filter.category) return false;
+          return true;
+        });
+        return filtered.sort((a, b) => a.name.localeCompare(b.name));
+      });
 
       // 收集所有文件名
       const allNames = new Set();
@@ -48,40 +66,63 @@ function App() {
       const sortedNames = Array.from(allNames).sort();
 
       // 构建对比列表 - 每个文件名在所有文件夹中对齐
-      const photos = [];
+      const alignedPhotos = [];
       sortedNames.forEach(name => {
         folderPhotoGroups.forEach(group => {
           const photo = group.find(p => p.name === name);
-          if (photo) {
-            photos.push(photo);
-          } else {
-            // 占位符 - 该文件夹没有这个文件
-            photos.push(null);
-          }
+          alignedPhotos.push(photo || null); // null 作为占位符
         });
       });
 
-      // 过滤掉占位符并分页
-      return photos.slice(0, displayCount * compareColumns);
+      // 分页
+      return alignedPhotos.slice(0, displayCount * compareColumns);
     } else {
       return filteredPhotos.slice(0, displayCount);
     }
-  }, [isCompareMode, selectedFolders, filteredPhotos, displayCount, compareColumns]);
+  }, [isCompareMode, selectedFolders, folderMap, filter, filteredPhotos, displayCount, compareColumns]);
 
-  // 为每张图片创建缩略图 URL (延迟创建,节省内存)
+  // 管理 Object URLs 生命周期 - 修复内存泄漏
+  useEffect(() => {
+    const newUrls = new Map();
+
+    displayPhotos.forEach(photo => {
+      if (photo && !photo.thumbnailUrl && photo.file) {
+        const url = URL.createObjectURL(photo.file);
+        newUrls.set(photo.id, url);
+      }
+    });
+
+    setObjectUrls(prevUrls => {
+      // 清理旧的 URLs
+      prevUrls.forEach((url, id) => {
+        if (!newUrls.has(id)) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      return newUrls;
+    });
+
+    // 组件卸载时清理所有 URLs
+    return () => {
+      newUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [displayPhotos]);
+
+  // 为显示的图片附加 URL - 优化：避免创建新对象，直接使用原对象
   const displayPhotosWithUrls = useMemo(() => {
     return displayPhotos.map(photo => {
       if (!photo) return null;
+      // 如果已经有 thumbnailUrl，直接返回原对象
       if (photo.thumbnailUrl) return photo;
-      if (photo.file) {
-        return {
-          ...photo,
-          thumbnailUrl: URL.createObjectURL(photo.file)
-        };
+
+      const url = objectUrls.get(photo.id);
+      if (url) {
+        // 只在需要时创建新对象
+        return { ...photo, thumbnailUrl: url };
       }
       return photo;
     });
-  }, [displayPhotos]);
+  }, [displayPhotos, objectUrls]);
 
   // 滚动加载更多
   useEffect(() => {
@@ -102,50 +143,46 @@ function App() {
   // 当过滤变化时重置显示数量
   useEffect(() => {
     setDisplayCount(100);
-  }, [filterFn]);
+  }, [filter]);
 
-  // 拖放处理
+  // 拖放处理 - 简化：合并事件监听器
   useEffect(() => {
-    const handleDragEnter = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(true);
-    };
-
-    const handleDragOver = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    const handleDragLeave = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      // 只在离开整个窗口时才取消拖放状态
-      if (e.target === document.body || e.target === document.documentElement) {
+    const dragHandlers = {
+      dragenter: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+      },
+      dragover: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      },
+      dragleave: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.target === document.body || e.target === document.documentElement) {
+          setIsDragging(false);
+        }
+      },
+      drop: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         setIsDragging(false);
+        const importEvent = new CustomEvent('dropFolder', { detail: e.dataTransfer });
+        window.dispatchEvent(importEvent);
       }
     };
 
-    const handleDrop = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
+    // 批量注册
+    Object.entries(dragHandlers).forEach(([event, handler]) => {
+      window.addEventListener(event, handler);
+    });
 
-      // 触发导入
-      const importEvent = new CustomEvent('dropFolder', { detail: e.dataTransfer });
-      window.dispatchEvent(importEvent);
-    };
-
-    window.addEventListener('dragenter', handleDragEnter);
-    window.addEventListener('dragover', handleDragOver);
-    window.addEventListener('dragleave', handleDragLeave);
-    window.addEventListener('drop', handleDrop);
-
+    // 批量清理
     return () => {
-      window.removeEventListener('dragenter', handleDragEnter);
-      window.removeEventListener('dragover', handleDragOver);
-      window.removeEventListener('dragleave', handleDragLeave);
-      window.removeEventListener('drop', handleDrop);
+      Object.entries(dragHandlers).forEach(([event, handler]) => {
+        window.removeEventListener(event, handler);
+      });
     };
   }, []);
 
@@ -160,19 +197,19 @@ function App() {
 
       if (!targetPhotoId) return;
 
-      if (e.key === '1') {
+      if (e.key === 'a' || e.key === 'A') {
         e.preventDefault();
         setCategory(targetPhotoId, 'correct');
         moveToNext();
-      } else if (e.key === '2') {
+      } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
         setCategory(targetPhotoId, 'medium');
         moveToNext();
-      } else if (e.key === '3') {
+      } else if (e.key === 'd' || e.key === 'D') {
         e.preventDefault();
         setCategory(targetPhotoId, 'wrong');
         moveToNext();
-      } else if (e.key === '0') {
+      } else if (e.key === '0' || e.key === 'x' || e.key === 'X') {
         e.preventDefault();
         setCategory(targetPhotoId, null);
       } else if (e.key === 'ArrowLeft') {
@@ -258,7 +295,7 @@ function App() {
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧文件夹面板 */}
         <FolderPanel
-          onFilterChange={setFilterFn}
+          onFilterChange={setFilter}
           onSelectedFoldersChange={setSelectedFolders}
         />
 
