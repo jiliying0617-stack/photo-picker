@@ -22,6 +22,7 @@ function App() {
   const [previewPhotos, setPreviewPhotos] = useState(null); // 预览的图片列表
   const [isDragging, setIsDragging] = useState(false); // 是否正在拖放
   const [objectUrls, setObjectUrls] = useState(new Map()); // 管理 Object URLs 生命周期
+  const [contextMenu, setContextMenu] = useState(null); // 右键菜单状态 { x, y, photoId }
 
   // 是否为对比模式 (2-8个文件夹)
   const isCompareMode = selectedFolders.length >= 2 && selectedFolders.length <= 8;
@@ -145,6 +146,15 @@ function App() {
   useEffect(() => {
     setDisplayCount(100);
   }, [filter]);
+
+  // 点击其他地方关闭右键菜单
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      window.addEventListener('click', handleClick);
+      return () => window.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
 
   // 拖放处理 - 简化：合并事件监听器
   useEffect(() => {
@@ -419,6 +429,15 @@ function App() {
                 setPreviewPhotos(photosToPreview);
               };
 
+              const handleContextMenu = (e) => {
+                e.preventDefault();
+                setContextMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  photoId: photo.id
+                });
+              };
+
               return (
                 <div key={photo.id} className={`neu-card rounded-2xl overflow-hidden ${isBoxSelected ? 'ring-4 ring-blue-500' : ''}`}>
                   {isCompareMode && (
@@ -436,6 +455,7 @@ function App() {
                   <div
                     onClick={handlePhotoClick}
                     onDoubleClick={handleDoubleClick}
+                    onContextMenu={handleContextMenu}
                     className={`
                       relative group cursor-pointer
                       transition-all duration-200
@@ -534,6 +554,66 @@ function App() {
       </div>
 
       <StatusBar />
+
+      {/* 右键菜单 */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 neu-card rounded-xl overflow-hidden shadow-2xl"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="py-2 min-w-[180px]">
+            <button
+              onClick={() => {
+                setCategory(contextMenu.photoId, 'correct');
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2 text-left hover:bg-green-50 transition-colors flex items-center gap-3"
+            >
+              <span className="text-green-600 font-bold text-lg">✓</span>
+              <span className="text-gray-700">正确</span>
+              <span className="ml-auto text-xs text-gray-400">1</span>
+            </button>
+            <button
+              onClick={() => {
+                setCategory(contextMenu.photoId, 'medium');
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2 text-left hover:bg-yellow-50 transition-colors flex items-center gap-3"
+            >
+              <span className="text-yellow-600 font-bold text-lg">~</span>
+              <span className="text-gray-700">中等</span>
+              <span className="ml-auto text-xs text-gray-400">2</span>
+            </button>
+            <button
+              onClick={() => {
+                setCategory(contextMenu.photoId, 'wrong');
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2 text-left hover:bg-red-50 transition-colors flex items-center gap-3"
+            >
+              <span className="text-red-600 font-bold text-lg">✕</span>
+              <span className="text-gray-700">错误</span>
+              <span className="ml-auto text-xs text-gray-400">3</span>
+            </button>
+            <div className="border-t border-gray-200 my-1"></div>
+            <button
+              onClick={() => {
+                setCategory(contextMenu.photoId, null);
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
+            >
+              <span className="text-gray-400 font-bold text-lg">○</span>
+              <span className="text-gray-500">取消标签</span>
+              <span className="ml-auto text-xs text-gray-400">X</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 大图预览 */}
       {previewPhotos && (
