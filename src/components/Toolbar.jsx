@@ -22,10 +22,9 @@ function Toolbar() {
   const handleClearCategories = () => {
     const categoryCount = Object.keys(categories).length;
     if (categoryCount === 0) return;
-    if (confirm(`确定要清空所有 ${categoryCount} 个分类标签吗?\n(此操作不可撤销，但图片会保留)`)) {
+    if (confirm(`确定要清空所有分类标签和图片吗?\n共 ${categoryCount} 个标签，${photos.length} 张图片\n(此操作不可撤销)`)) {
       clearCategories();
-      // 刷新页面以显示更新后的状态
-      window.location.reload();
+      clearPhotos();
     }
   };
 
@@ -68,9 +67,9 @@ function Toolbar() {
             <button
               onClick={handleClearCategories}
               className="px-5 py-2 neu-button rounded-xl text-gray-600 hover:text-orange-600 font-medium text-sm"
-              title={`清空 ${categoryCount} 个分类标签`}
+              title={`清空 ${categoryCount} 个标签和 ${photos.length} 张图片`}
             >
-              清空标签 ({categoryCount})
+              清空全部 ({categoryCount})
             </button>
           )}
           <Exporter />

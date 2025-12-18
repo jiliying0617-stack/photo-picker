@@ -186,32 +186,53 @@ function App() {
     };
   }, []);
 
-  // 键盘快捷键
+  // 键盘快捷键 - 极速打标模式
   useEffect(() => {
     const handleKeyDown = (e) => {
-      let targetPhotoId = selectedPhotoId;
-      if (!targetPhotoId && filteredPhotos.length > 0) {
-        targetPhotoId = filteredPhotos[0].id;
-        setSelectedPhotoId(targetPhotoId);
+      // 极速打标：如果有框选的图片，给所有框选图片打标签
+      const targetPhotos = selectedPhotos.length > 0
+        ? selectedPhotos
+        : (selectedPhotoId ? [selectedPhotoId] : []);
+
+      if (targetPhotos.length === 0 && filteredPhotos.length > 0) {
+        // 如果没有选中任何图片，默认选中第一张
+        const firstId = filteredPhotos[0].id;
+        setSelectedPhotoId(firstId);
+        return;
       }
 
-      if (!targetPhotoId) return;
+      if (targetPhotos.length === 0) return;
 
-      if (e.key === 'a' || e.key === 'A') {
+      // 批量打标签
+      const batchSetCategory = (category) => {
         e.preventDefault();
-        setCategory(targetPhotoId, 'correct');
-        moveToNext();
-      } else if (e.key === 's' || e.key === 'S') {
-        e.preventDefault();
-        setCategory(targetPhotoId, 'medium');
-        moveToNext();
-      } else if (e.key === 'd' || e.key === 'D') {
-        e.preventDefault();
-        setCategory(targetPhotoId, 'wrong');
-        moveToNext();
+        targetPhotos.forEach(photoId => {
+          setCategory(photoId, category);
+        });
+        // 清除框选
+        if (selectedPhotos.length > 0) {
+          setSelectedPhotos([]);
+        }
+        // 如果是单张图片，移动到下一张
+        if (targetPhotos.length === 1) {
+          moveToNext();
+        }
+      };
+
+      if (e.key === '1') {
+        batchSetCategory('correct');
+      } else if (e.key === '2') {
+        batchSetCategory('medium');
+      } else if (e.key === '3') {
+        batchSetCategory('wrong');
       } else if (e.key === '0' || e.key === 'x' || e.key === 'X') {
         e.preventDefault();
-        setCategory(targetPhotoId, null);
+        targetPhotos.forEach(photoId => {
+          setCategory(photoId, null);
+        });
+        if (selectedPhotos.length > 0) {
+          setSelectedPhotos([]);
+        }
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         moveToPrev();
@@ -235,7 +256,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedPhotoId, filteredPhotos, setCategory, setSelectedPhotoId]);
+  }, [selectedPhotoId, selectedPhotos, filteredPhotos, setCategory, setSelectedPhotoId]);
 
   // 检测是否有分类数据但缺少图片文件
   const hasDataButNoImages = photos.length > 0 && photos.every(p => !p.file && !p.thumbnailUrl);

@@ -49,17 +49,20 @@ function StatusBar() {
           </div>
         </div>
 
-        {/* 快捷键提示 */}
+        {/* 快捷键提示 - 极速模式 */}
         <div className="text-xs text-gray-400 font-light flex items-center gap-3">
-          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">A</kbd>
-          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">S</kbd>
-          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">D</kbd>
+          <span className="text-blue-600 font-medium">⚡ 极速模式</span>
+          <span className="text-gray-400">·</span>
+          <kbd className="neu-convex px-2 py-1 rounded text-green-600 font-medium">1</kbd>
+          <kbd className="neu-convex px-2 py-1 rounded text-yellow-600 font-medium">2</kbd>
+          <kbd className="neu-convex px-2 py-1 rounded text-red-600 font-medium">3</kbd>
           <span className="text-gray-400">·</span>
           <kbd className="neu-convex px-2 py-1 rounded text-gray-600">X</kbd>
           <span>取消</span>
           <span className="text-gray-400">·</span>
           <kbd className="neu-convex px-2 py-1 rounded text-gray-600">←→</kbd>
           <span>切换</span>
+          <span className="text-gray-400 ml-2">(Shift/Ctrl多选)</span>
         </div>
       </div>
     </div>
