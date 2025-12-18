@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import usePhotoStore from './store/usePhotoStore';
 import Toolbar from './components/Toolbar';
 import StatusBar from './components/StatusBar';
@@ -11,8 +11,6 @@ function App() {
   const setCategory = usePhotoStore((state) => state.setCategory);
   const selectedPhotoId = usePhotoStore((state) => state.selectedPhotoId);
   const setSelectedPhotoId = usePhotoStore((state) => state.setSelectedPhotoId);
-  const loadPhotos = usePhotoStore((state) => state.loadPhotos);
-  const isLoading = usePhotoStore((state) => state.isLoading);
 
   const [displayCount, setDisplayCount] = useState(100);
   const [filterFn, setFilterFn] = useState(() => null);
@@ -20,11 +18,7 @@ function App() {
   const [selectedPhotos, setSelectedPhotos] = useState([]); // 框选的图片
   const [isSelecting, setIsSelecting] = useState(false); // 是否处于框选模式
   const [previewPhotos, setPreviewPhotos] = useState(null); // 预览的图片列表
-
-  // 启动时从 IndexedDB 加载图片
-  useEffect(() => {
-    loadPhotos();
-  }, [loadPhotos]);
+  const [isDragging, setIsDragging] = useState(false); // 是否正在拖放
 
   // 是否为对比模式 (2-8个文件夹)
   const isCompareMode = selectedFolders.length >= 2 && selectedFolders.length <= 8;
@@ -33,45 +27,61 @@ function App() {
   // 过滤后的图片列表
   const filteredPhotos = filterFn ? photos.filter(filterFn) : photos;
 
-  // 对比模式下的图片排列
-  let displayPhotos;
-  if (isCompareMode) {
-    // 按文件夹分组
-    const folderPhotoGroups = selectedFolders.map(folderPath =>
-      filteredPhotos.filter(p => {
-        const pathParts = p.path.split('/');
-        pathParts.pop();
-        const photoFolderPath = pathParts.join('/');
-        return photoFolderPath.startsWith(folderPath);
-      }).sort((a, b) => a.name.localeCompare(b.name))
-    );
+  // 对比模式下的图片排列 (使用 useMemo 缓存)
+  const displayPhotos = useMemo(() => {
+    if (isCompareMode) {
+      // 按文件夹分组
+      const folderPhotoGroups = selectedFolders.map(folderPath =>
+        filteredPhotos.filter(p => {
+          const pathParts = p.path.split('/');
+          pathParts.pop();
+          const photoFolderPath = pathParts.join('/');
+          return photoFolderPath.startsWith(folderPath);
+        }).sort((a, b) => a.name.localeCompare(b.name))
+      );
 
-    // 收集所有文件名
-    const allNames = new Set();
-    folderPhotoGroups.forEach(group => {
-      group.forEach(p => allNames.add(p.name));
-    });
-    const sortedNames = Array.from(allNames).sort();
-
-    // 构建对比列表 - 每个文件名在所有文件夹中对齐
-    displayPhotos = [];
-    sortedNames.forEach(name => {
+      // 收集所有文件名
+      const allNames = new Set();
       folderPhotoGroups.forEach(group => {
-        const photo = group.find(p => p.name === name);
-        if (photo) {
-          displayPhotos.push(photo);
-        } else {
-          // 占位符 - 该文件夹没有这个文件
-          displayPhotos.push(null);
-        }
+        group.forEach(p => allNames.add(p.name));
       });
-    });
+      const sortedNames = Array.from(allNames).sort();
 
-    // 过滤掉占位符并分页
-    displayPhotos = displayPhotos.slice(0, displayCount * compareColumns);
-  } else {
-    displayPhotos = filteredPhotos.slice(0, displayCount);
-  }
+      // 构建对比列表 - 每个文件名在所有文件夹中对齐
+      const photos = [];
+      sortedNames.forEach(name => {
+        folderPhotoGroups.forEach(group => {
+          const photo = group.find(p => p.name === name);
+          if (photo) {
+            photos.push(photo);
+          } else {
+            // 占位符 - 该文件夹没有这个文件
+            photos.push(null);
+          }
+        });
+      });
+
+      // 过滤掉占位符并分页
+      return photos.slice(0, displayCount * compareColumns);
+    } else {
+      return filteredPhotos.slice(0, displayCount);
+    }
+  }, [isCompareMode, selectedFolders, filteredPhotos, displayCount, compareColumns]);
+
+  // 为每张图片创建缩略图 URL (延迟创建,节省内存)
+  const displayPhotosWithUrls = useMemo(() => {
+    return displayPhotos.map(photo => {
+      if (!photo) return null;
+      if (photo.thumbnailUrl) return photo;
+      if (photo.file) {
+        return {
+          ...photo,
+          thumbnailUrl: URL.createObjectURL(photo.file)
+        };
+      }
+      return photo;
+    });
+  }, [displayPhotos]);
 
   // 滚动加载更多
   useEffect(() => {
@@ -93,6 +103,51 @@ function App() {
   useEffect(() => {
     setDisplayCount(100);
   }, [filterFn]);
+
+  // 拖放处理
+  useEffect(() => {
+    const handleDragEnter = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(true);
+    };
+
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleDragLeave = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // 只在离开整个窗口时才取消拖放状态
+      if (e.target === document.body || e.target === document.documentElement) {
+        setIsDragging(false);
+      }
+    };
+
+    const handleDrop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+
+      // 触发导入
+      const importEvent = new CustomEvent('dropFolder', { detail: e.dataTransfer });
+      window.dispatchEvent(importEvent);
+    };
+
+    window.addEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('drop', handleDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, []);
 
   // 键盘快捷键
   useEffect(() => {
@@ -146,7 +201,7 @@ function App() {
   }, [selectedPhotoId, filteredPhotos, setCategory, setSelectedPhotoId]);
 
   // 检测是否有分类数据但缺少图片文件
-  const hasDataButNoImages = photos.length > 0 && photos.every(p => !p.thumbnailUrl);
+  const hasDataButNoImages = photos.length > 0 && photos.every(p => !p.file && !p.thumbnailUrl);
 
   // 空状态
   if (photos.length === 0 || hasDataButNoImages) {
@@ -174,7 +229,7 @@ function App() {
             ) : (
               <>
                 <div className="text-xl font-light text-gray-500 mb-2">暂无图片</div>
-                <div className="text-sm text-gray-400">点击上方 "导入文件夹" 开始挑图</div>
+                <div className="text-sm text-gray-400">点击上方 "导入文件夹" 开始筛图</div>
               </>
             )}
           </div>
@@ -184,8 +239,21 @@ function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[#e0e5ec]">
+    <div className="h-screen flex flex-col bg-[#e0e5ec] relative">
       <Toolbar />
+
+      {/* 拖放蒙层 */}
+      {isDragging && (
+        <div className="fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="neu-card p-12 rounded-3xl shadow-2xl">
+            <div className="text-center">
+              <div className="text-6xl mb-4">📁</div>
+              <div className="text-2xl font-bold text-gray-800 mb-2">松开鼠标导入文件夹</div>
+              <div className="text-sm text-gray-500">支持拖入包含图片的文件夹</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧文件夹面板 */}
@@ -214,7 +282,7 @@ function App() {
             className="grid gap-4"
             style={{ gridTemplateColumns: `repeat(${compareColumns}, 1fr)` }}
           >
-            {displayPhotos.map((photo, idx) => {
+            {displayPhotosWithUrls.map((photo, idx) => {
               // 处理占位符
               if (!photo) {
                 return (
@@ -254,7 +322,7 @@ function App() {
               const handleDoubleClick = () => {
                 // 双击打开预览
                 const photosToPreview = selectedPhotos.length > 0
-                  ? displayPhotos.filter(p => p && selectedPhotos.includes(p.id))
+                  ? displayPhotosWithUrls.filter(p => p && selectedPhotos.includes(p.id))
                   : [photo];
                 setPreviewPhotos(photosToPreview);
               };
@@ -354,7 +422,7 @@ function App() {
                 </div>
                 <button
                   onClick={() => {
-                    const photosToPreview = displayPhotos.filter(p => p && selectedPhotos.includes(p.id));
+                    const photosToPreview = displayPhotosWithUrls.filter(p => p && selectedPhotos.includes(p.id));
                     setPreviewPhotos(photosToPreview);
                   }}
                   className="px-4 py-2 neu-button rounded-lg text-blue-600 text-sm font-medium"
@@ -383,6 +451,10 @@ function App() {
           onClose={() => {
             setPreviewPhotos(null);
             setSelectedPhotos([]);
+          }}
+          allPhotos={displayPhotosWithUrls}
+          onGroupChange={(newGroupPhotos) => {
+            setPreviewPhotos(newGroupPhotos);
           }}
         />
       )}

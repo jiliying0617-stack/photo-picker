@@ -23,7 +23,7 @@ function Toolbar() {
         {/* Logo */}
         <div className="flex items-center gap-6">
           <h1 className="text-2xl font-light text-gray-700 tracking-wide">
-            ⚡ PhotoPicker
+            ⚡ 筛图神器
           </h1>
 
           {/* 列数切换 */}

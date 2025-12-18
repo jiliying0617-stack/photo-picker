@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
-import { importFolder, isFileSystemAccessSupported } from '../utils/fileSystem';
+import { importFolder, importFolderFromDrop, isFileSystemAccessSupported } from '../utils/fileSystem';
 
 function FileImporter() {
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const photos = usePhotoStore((state) => state.photos);
   const setPhotos = usePhotoStore((state) => state.setPhotos);
 
   const handleImport = async () => {
@@ -18,24 +17,22 @@ function FileImporter() {
     setProgress({ current: 0, total: 0 });
 
     try {
+      console.log('[导入] 开始导入文件夹...');
+
       const { photos: newPhotos, folderName } = await importFolder((p) => {
         setProgress(p);
       });
 
+      console.log(`[导入] 读取到 ${newPhotos.length} 张图片`);
+
       if (newPhotos.length > 0) {
-        // 恢复之前的分类标记
-        const existingCategories = new Map(
-          photos.map(p => [p.path, p.category])
-        );
+        console.log(`[导入] 保存到 store (会自动从 localStorage 恢复分类标记)`);
 
-        const mergedPhotos = newPhotos.map(photo => ({
-          ...photo,
-          category: existingCategories.get(photo.path) || photo.category
-        }));
+        // setPhotos 会自动从 localStorage 恢复分类标记
+        setPhotos(newPhotos);
 
-        setPhotos(mergedPhotos);
-
-        const restoredCount = mergedPhotos.filter(p => p.category).length;
+        // 统计恢复的分类数量
+        const restoredCount = newPhotos.filter(p => p.category).length;
         const message = restoredCount > 0
           ? `成功导入 ${newPhotos.length} 张图片!\n文件夹: ${folderName}\n\n✨ 已恢复 ${restoredCount} 张图片的分类标记`
           : `成功导入 ${newPhotos.length} 张图片!\n文件夹: ${folderName}`;
@@ -50,6 +47,43 @@ function FileImporter() {
       setProgress({ current: 0, total: 0 });
     }
   };
+
+  // 监听拖放事件
+  useEffect(() => {
+    const handleDropFolder = async (e) => {
+      const dataTransfer = e.detail;
+      if (!dataTransfer || !dataTransfer.items) return;
+
+      setImporting(true);
+      setProgress({ current: 0, total: 0 });
+
+      try {
+        const { photos: newPhotos, folderName } = await importFolderFromDrop(dataTransfer, (p) => {
+          setProgress(p);
+        });
+
+        if (newPhotos.length > 0) {
+          setPhotos(newPhotos);
+
+          const restoredCount = newPhotos.filter(p => p.category).length;
+          const message = restoredCount > 0
+            ? `成功导入 ${newPhotos.length} 张图片!\n文件夹: ${folderName}\n\n✨ 已恢复 ${restoredCount} 张图片的分类标记`
+            : `成功导入 ${newPhotos.length} 张图片!\n文件夹: ${folderName}`;
+
+          alert(message);
+        }
+      } catch (error) {
+        console.error('拖放导入失败:', error);
+        alert(`导入失败: ${error.message}`);
+      } finally {
+        setImporting(false);
+        setProgress({ current: 0, total: 0 });
+      }
+    };
+
+    window.addEventListener('dropFolder', handleDropFolder);
+    return () => window.removeEventListener('dropFolder', handleDropFolder);
+  }, [setPhotos]);
 
   return (
     <div className="flex items-center gap-4">

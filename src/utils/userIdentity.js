@@ -3,23 +3,31 @@
 
 // 生成简单的浏览器指纹
 function generateFingerprint() {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  ctx.textBaseline = 'top';
-  ctx.font = '14px Arial';
-  ctx.fillText('fingerprint', 0, 0);
-  const canvasData = canvas.toDataURL();
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText('fingerprint', 0, 0);
+    }
+    const canvasData = canvas.toDataURL();
 
-  const fingerprint = {
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    platform: navigator.platform,
-    screenResolution: `${screen.width}x${screen.height}`,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    canvasHash: canvasData.slice(0, 50), // 取前50字符
-  };
+    const fingerprint = {
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      platform: navigator.platform,
+      screenResolution: `${screen.width}x${screen.height}`,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      canvasHash: canvasData.slice(0, 50), // 取前50字符
+    };
 
-  return btoa(JSON.stringify(fingerprint)).slice(0, 32);
+    return btoa(JSON.stringify(fingerprint)).slice(0, 32);
+  } catch (error) {
+    console.error('生成指纹失败:', error);
+    // 降级方案：使用简单的随机ID
+    return `fallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
 }
 
 // 获取或创建用户ID

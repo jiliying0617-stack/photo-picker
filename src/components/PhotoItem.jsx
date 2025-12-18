@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 
 function PhotoItem({ photo, style }) {
@@ -6,6 +7,17 @@ function PhotoItem({ photo, style }) {
   const setSelectedPhotoId = usePhotoStore((state) => state.setSelectedPhotoId);
 
   const isSelected = selectedPhotoId === photo.id;
+
+  // 延迟创建缩略图 URL (只在渲染时创建,节省内存)
+  const thumbnailUrl = useMemo(() => {
+    if (photo.thumbnailUrl) {
+      return photo.thumbnailUrl;
+    }
+    if (photo.file) {
+      return URL.createObjectURL(photo.file);
+    }
+    return null;
+  }, [photo.thumbnailUrl, photo.file]);
 
   // 分类配置
   const categoryConfig = {
@@ -36,7 +48,7 @@ function PhotoItem({ photo, style }) {
         {/* 图片 */}
         <div className="aspect-square overflow-hidden neu-concave rounded-xl">
           <img
-            src={photo.thumbnailUrl}
+            src={thumbnailUrl}
             alt={photo.name}
             loading="lazy"
             className="w-full h-full object-cover"
