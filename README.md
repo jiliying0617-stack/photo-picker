@@ -1,146 +1,100 @@
-# ⚡ 筛图神器
+# 筛图神器
 
-一个极速的摄影师选片工具，支持快速导入、多文件夹对比、快捷键分类和一键导出。
+摄影师选片工具。快速导入、快捷键分类、一键导出。
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![React](https://img.shields.io/badge/React-19.2-61dafb.svg)
-![Vite](https://img.shields.io/badge/Vite-7.2-646cff.svg)
+## 为什么要用这个？
 
-## ✨ 特性
+- **快** - 2000+ 张图片秒开，虚拟滚动，不卡顿
+- **简单** - 键盘 1/2/3 打标签，不用鼠标点来点去
+- **对比** - 多文件夹并排看，按文件名自动对齐
+- **安全** - 纯前端，数据不上传，刷新不丢失
+- **导出** - 按分类导出，保留原文件夹结构
 
-- 🚀 **极速导入** - 支持导入 2000+ 张图片，秒级响应
-- 🖼️ **多文件夹对比** - 2-8 个文件夹并排对比，按文件名对齐
-- 🎯 **快捷键分类** - 数字键 1/2/3 快速打标签（正确/适中/错误）
-- 🔄 **组切换** - 键盘 ↑↓ 快速切换对比组
-- 💾 **数据持久化** - 刷新页面不丢失分类标记
-- 📤 **灵活导出** - 选择性导出分类，保留原文件夹结构
-- 🎨 **Neumorphism 设计** - 精致的新拟态 UI
-- 📱 **拖放导入** - 直接拖入文件夹即可导入
-- 🔒 **隐私安全** - 纯前端运行，数据不上传服务器
-
-## 🎬 快速开始
+## 使用
 
 ### 在线使用
 
-访问 [https://YOUR_USERNAME.github.io/](https://YOUR_USERNAME.github.io/) 即可使用
+访问 https://jiliying0617-stack.github.io/
 
-**注意：** 文件夹导入功能需要使用 **Chrome** 或 **Edge** 浏览器
+**需要 Chrome 或 Edge 浏览器**（Firefox/Safari 不支持文件夹导入）
 
 ### 本地运行
 
 ```bash
-# 克隆项目
-git clone https://github.com/YOUR_USERNAME/photo-picker.git
-cd photo-picker
-
-# 安装依赖
 npm install
-
-# 启动开发服务器
 npm run dev
-
-# 访问 http://localhost:5173
 ```
 
-## 📖 使用指南
+访问 http://localhost:5173
 
-### 1. 导入图片
+## 操作
 
-**方式一：点击导入**
-- 点击顶部 "导入文件夹" 按钮
-- 选择包含图片的文件夹
+### 导入
+- 点击 "导入文件夹" 或直接拖入文件夹
 
-**方式二：拖放导入**
-- 直接将文件夹拖入页面
-
-### 2. 查看和对比
-
-- **单列模式**：点击顶部 "2列/3列/5列" 切换显示
-- **对比模式**：在左侧面板选择 2-8 个文件夹，自动进入对比模式
-
-### 3. 分类打标
-
-**快捷键：**
-- `1` - 标记为"正确"（绿色 ✓）
-- `2` - 标记为"适中"（黄色 ~）
-- `3` - 标记为"错误"（红色 ✕）
+### 分类
+- `1` - 正确 (绿色 ✓)
+- `2` - 适中 (黄色 ~)
+- `3` - 错误 (红色 ✕)
 - `0` - 清除标记
 - `←/→` - 切换图片
-- `↑/↓` - 切换对比组（对比模式）
+- `↑/↓` - 切换对比组
 
-**鼠标操作：**
-- 单击图片 - 选中
-- 双击图片 - 大图预览
-- Shift/Ctrl + 点击 - 多选
-- 悬停图片 - 显示分类按钮
+### 对比
+- 左侧选择 2-8 个文件夹
+- 自动按文件名对齐显示
+- 缺失的文件显示占位符
 
-### 4. 导出结果
+### 导出
+1. 点击 "导出"
+2. 勾选要导出的分类
+3. 选择目标文件夹
+4. 完成
 
-1. 点击顶部 "导出" 按钮
-2. 选择要导出的分类（正确/适中/错误/未打标）
-3. 选择导出目标文件夹
-4. 等待导出完成
-
-**导出结构：**
+导出结构：
 ```
-导出文件夹/
+目标文件夹/
 ├── 正确/
-│   ├── folder1/
-│   │   └── image1.jpg
-│   └── folder2/
-│       └── image2.jpg
+│   └── (保留原文件夹结构)
 ├── 适中/
 ├── 错误/
 └── 未打标/
 ```
 
-## 🛠️ 技术栈
+## 技术栈
 
-- **前端框架**: React 19
-- **构建工具**: Vite 7
-- **状态管理**: Zustand
-- **样式方案**: Tailwind CSS + Neumorphism
-- **文件系统**: File System Access API
-- **虚拟滚动**: react-window
+- React 19 + Vite 7
+- Zustand (状态管理)
+- Tailwind CSS
+- File System Access API
+- react-window (虚拟滚动)
 
-## 📦 部署
+## 部署到 GitHub Pages
 
-查看详细部署指南：[DEPLOY.md](./DEPLOY.md)
+1. 在 GitHub 创建仓库（必须 Public）
+2. 推送代码：
+   ```bash
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin https://github.com/你的用户名/photo-picker.git
+   git push -u origin main
+   ```
+3. 仓库设置 → Pages → Source 选择 "GitHub Actions"
+4. 等待 2-3 分钟自动部署完成
 
-**快速部署到 GitHub Pages：**
+## 浏览器兼容性
 
-```bash
-# 1. 创建 GitHub 仓库并推送代码
-git add .
-git commit -m "🎉 Initial commit"
-git remote add origin https://github.com/YOUR_USERNAME/photo-picker.git
-git push -u origin main
+| 浏览器 | 支持 |
+|--------|------|
+| Chrome 86+ | ✅ |
+| Edge 86+ | ✅ |
+| Firefox | ⚠️ 不支持文件夹导入 |
+| Safari | ⚠️ 不支持文件夹导入 |
 
-# 2. 在 GitHub 仓库设置中启用 Pages（Source: GitHub Actions）
-# 3. 等待自动部署完成
-```
+## 开源协议
 
-## 🎯 浏览器兼容性
-
-| 浏览器 | 支持情况 | 备注 |
-|--------|----------|------|
-| Chrome 86+ | ✅ 完全支持 | 推荐 |
-| Edge 86+ | ✅ 完全支持 | 推荐 |
-| Firefox | ⚠️ 部分支持 | 不支持文件夹导入 |
-| Safari | ⚠️ 部分支持 | 不支持文件夹导入 |
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 开源协议
-
-MIT License
-
-## 🙏 致谢
-
-感谢所有使用和支持这个项目的朋友们！
+MIT
 
 ---
 
-**Made with ❤️ by [Your Name]**
+Simple. Fast. Good.
