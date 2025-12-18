@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import usePhotoStore from './store/usePhotoStore';
 import Toolbar from './components/Toolbar';
 import StatusBar from './components/StatusBar';
@@ -187,7 +187,41 @@ function App() {
     };
   }, []);
 
-  // 键盘快捷键 - 极速打标模式（性能优化版）
+  // 使用 ref 存储最新状态，避免频繁重建监听器
+  const selectedPhotosRef = useRef(selectedPhotos);
+  const selectedPhotoIdRef = useRef(selectedPhotoId);
+  const filteredPhotosRef = useRef(filteredPhotos);
+
+  useEffect(() => {
+    selectedPhotosRef.current = selectedPhotos;
+  }, [selectedPhotos]);
+
+  useEffect(() => {
+    selectedPhotoIdRef.current = selectedPhotoId;
+  }, [selectedPhotoId]);
+
+  useEffect(() => {
+    filteredPhotosRef.current = filteredPhotos;
+  }, [filteredPhotos]);
+
+  // 稳定的导航函数
+  const moveToNext = useCallback(() => {
+    const currentId = selectedPhotoIdRef.current;
+    const photos = filteredPhotosRef.current;
+    if (!currentId || photos.length === 0) return;
+    const idx = photos.findIndex(p => p.id === currentId);
+    if (idx < photos.length - 1) setSelectedPhotoId(photos[idx + 1].id);
+  }, [setSelectedPhotoId]);
+
+  const moveToPrev = useCallback(() => {
+    const currentId = selectedPhotoIdRef.current;
+    const photos = filteredPhotosRef.current;
+    if (!currentId || photos.length === 0) return;
+    const idx = photos.findIndex(p => p.id === currentId);
+    if (idx > 0) setSelectedPhotoId(photos[idx - 1].id);
+  }, [setSelectedPhotoId]);
+
+  // 键盘快捷键 - 极速打标模式（响应优化版）
   useEffect(() => {
     const handleKeyDown = (e) => {
       // 防止干扰表单输入
@@ -195,14 +229,19 @@ function App() {
         return;
       }
 
-      // 极速打标：如果有框选的图片，给所有框选图片打标签
-      const targetPhotos = selectedPhotos.length > 0
-        ? selectedPhotos
-        : (selectedPhotoId ? [selectedPhotoId] : []);
+      // 使用 ref 获取最新状态
+      const currentSelectedPhotos = selectedPhotosRef.current;
+      const currentSelectedPhotoId = selectedPhotoIdRef.current;
+      const currentFilteredPhotos = filteredPhotosRef.current;
 
-      if (targetPhotos.length === 0 && filteredPhotos.length > 0) {
+      // 极速打标：如果有框选的图片，给所有框选图片打标签
+      const targetPhotos = currentSelectedPhotos.length > 0
+        ? currentSelectedPhotos
+        : (currentSelectedPhotoId ? [currentSelectedPhotoId] : []);
+
+      if (targetPhotos.length === 0 && currentFilteredPhotos.length > 0) {
         // 如果没有选中任何图片，默认选中第一张
-        const firstId = filteredPhotos[0].id;
+        const firstId = currentFilteredPhotos[0].id;
         setSelectedPhotoId(firstId);
         return;
       }
@@ -221,7 +260,7 @@ function App() {
         }
 
         // 清除框选
-        if (selectedPhotos.length > 0) {
+        if (currentSelectedPhotos.length > 0) {
           setSelectedPhotos([]);
         }
 
@@ -248,21 +287,10 @@ function App() {
       }
     };
 
-    const moveToNext = () => {
-      if (!selectedPhotoId || filteredPhotos.length === 0) return;
-      const idx = filteredPhotos.findIndex(p => p.id === selectedPhotoId);
-      if (idx < filteredPhotos.length - 1) setSelectedPhotoId(filteredPhotos[idx + 1].id);
-    };
-
-    const moveToPrev = () => {
-      if (!selectedPhotoId || filteredPhotos.length === 0) return;
-      const idx = filteredPhotos.findIndex(p => p.id === selectedPhotoId);
-      if (idx > 0) setSelectedPhotoId(filteredPhotos[idx - 1].id);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedPhotoId, selectedPhotos, filteredPhotos, setCategory, setCategoryBatch, setSelectedPhotoId]);
+    // 监听器只设置一次，不会频繁重建
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [setCategory, setCategoryBatch, setSelectedPhotoId, setSelectedPhotos, moveToNext, moveToPrev]);
 
   // 检测是否有分类数据但缺少图片文件
   const hasDataButNoImages = photos.length > 0 && photos.every(p => !p.file && !p.thumbnailUrl);
