@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全局样式 */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #e0e5ec;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 新拟态效果 */
+.neu-flat {
+  background: #e0e5ec;
+  box-shadow:
+    6px 6px 12px rgba(163, 177, 198, 0.6),
+    -6px -6px 12px rgba(255, 255, 255, 0.9);
+}
+
+.neu-concave {
+  background: #e0e5ec;
+  box-shadow:
+    inset 4px 4px 8px rgba(163, 177, 198, 0.5),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.9);
+}
+
+.neu-convex {
+  background: #e0e5ec;
+  box-shadow:
+    4px 4px 8px rgba(163, 177, 198, 0.6),
+    -4px -4px 8px rgba(255, 255, 255, 0.9);
+}
+
+.neu-pressed {
+  background: #e0e5ec;
+  box-shadow:
+    inset 2px 2px 4px rgba(163, 177, 198, 0.6),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.9);
+}
+
+/* 按钮效果 */
+.neu-button {
+  background: #e0e5ec;
+  box-shadow:
+    4px 4px 8px rgba(163, 177, 198, 0.6),
+    -4px -4px 8px rgba(255, 255, 255, 0.9);
+  transition: all 0.2s;
+}
+
+.neu-button:hover {
+  box-shadow:
+    6px 6px 12px rgba(163, 177, 198, 0.7),
+    -6px -6px 12px rgba(255, 255, 255, 1);
+}
+
+.neu-button:active {
+  background: #e0e5ec;
+  box-shadow:
+    inset 2px 2px 4px rgba(163, 177, 198, 0.6),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.9);
+}
+
+/* 卡片效果 */
+.neu-card {
+  background: #e0e5ec;
+  border-radius: 1rem;
+  box-shadow:
+    6px 6px 12px rgba(163, 177, 198, 0.6),
+    -6px -6px 12px rgba(255, 255, 255, 0.9);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e0e5ec;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #a3b1c6;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8d9db6;
+}
