@@ -198,11 +198,51 @@ export async function importFolder(onProgress) {
   }
 }
 
+// 清理文件名/文件夹名，移除不允许的字符
+function sanitizeName(name, keepSpecialChars = true) {
+  if (!name) return 'unnamed';
+
+  // 移除或替换文件系统不允许的字符
+  // Windows: < > : " / \ | ? *
+  // macOS/Linux: / (null)
+  let cleaned = name
+    .replace(/[<>:"|?*]/g, '_')  // 替换为下划线
+    .replace(/\//g, '-')          // 斜杠替换为横杠
+    .replace(/\\/g, '-')          // 反斜杠替换为横杠
+    .replace(/\x00/g, '')         // 移除 null 字符
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // 移除控制字符
+    .trim();
+
+  // 如果不保留特殊字符，进一步清理
+  if (!keepSpecialChars) {
+    // 保留中文、英文、数字、基本标点和空格
+    cleaned = cleaned.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s._\-()[\]{}!@#$%^&+=~`',；。，、！？—…（）【】]/g, '_');
+  }
+
+  // 确保文件名不以点开头（避免隐藏文件）
+  cleaned = cleaned.replace(/^\.+/, '');
+
+  // 限制长度（大多数文件系统限制为255字节）
+  if (cleaned.length > 200) {
+    const ext = cleaned.match(/\.[^.]+$/)?.[0] || '';
+    const nameWithoutExt = cleaned.slice(0, -ext.length);
+    cleaned = nameWithoutExt.slice(0, 200 - ext.length) + ext;
+  }
+
+  return cleaned || 'unnamed';
+}
+
 // Export photos to folder with original folder structure preserved
-export async function exportPhotos(photos, selectedCategories, onProgress) {
+export async function exportPhotos(photos, selectedCategories, onProgress, options = {}) {
   if (!isFileSystemAccessSupported()) {
     throw new Error('File System Access API not supported. Please use Chrome or Edge.');
   }
+
+  // 默认选项
+  const {
+    keepOriginalNames = true,  // 保留原文件名（只清理非法字符）
+    keepFolderStructure = true // 保留文件夹结构
+  } = options;
 
   try {
     // Open folder picker for export destination
@@ -210,62 +250,109 @@ export async function exportPhotos(photos, selectedCategories, onProgress) {
       mode: 'readwrite'
     });
 
-    // Create category subfolders
+    // Create category subfolders (使用英文名避免兼容性问题)
     const categoryDirs = {};
+    const categoryNames = {
+      correct: '正确_Correct',
+      medium: '适中_Medium',
+      wrong: '错误_Wrong',
+      uncategorized: '未标记_Uncategorized'
+    };
+
     if (selectedCategories.correct) {
-      categoryDirs.correct = await targetDir.getDirectoryHandle('正确', { create: true });
+      categoryDirs.correct = await targetDir.getDirectoryHandle(categoryNames.correct, { create: true });
     }
     if (selectedCategories.medium) {
-      categoryDirs.medium = await targetDir.getDirectoryHandle('适中', { create: true });
+      categoryDirs.medium = await targetDir.getDirectoryHandle(categoryNames.medium, { create: true });
     }
     if (selectedCategories.wrong) {
-      categoryDirs.wrong = await targetDir.getDirectoryHandle('错误', { create: true });
+      categoryDirs.wrong = await targetDir.getDirectoryHandle(categoryNames.wrong, { create: true });
     }
     if (selectedCategories.uncategorized) {
-      categoryDirs.uncategorized = await targetDir.getDirectoryHandle('未打标', { create: true });
+      categoryDirs.uncategorized = await targetDir.getDirectoryHandle(categoryNames.uncategorized, { create: true });
     }
 
     let exported = 0;
+    const errors = [];
 
     for (const photo of photos) {
-      // Select target directory based on category
-      const categoryKey = photo.category || 'uncategorized';
-      const categoryDir = categoryDirs[categoryKey];
-      if (!categoryDir) continue;
+      try {
+        // Select target directory based on category
+        const categoryKey = photo.category || 'uncategorized';
+        const categoryDir = categoryDirs[categoryKey];
+        if (!categoryDir) continue;
 
-      // 解析原文件路径,保持文件夹结构
-      const pathParts = photo.path.split('/');
-      pathParts.pop(); // 移除文件名
+        let currentDir = categoryDir;
 
-      // 在分类文件夹下重建原文件夹结构
-      let currentDir = categoryDir;
-      for (const folderName of pathParts) {
-        currentDir = await currentDir.getDirectoryHandle(folderName, { create: true });
-      }
+        // 如果保留文件夹结构
+        if (keepFolderStructure) {
+          // 解析原文件路径，保持文件夹结构
+          const pathParts = photo.path.split('/');
+          pathParts.pop(); // 移除文件名
 
-      // Read file content
-      const arrayBuffer = await photo.file.arrayBuffer();
+          // 在分类文件夹下重建原文件夹结构
+          for (const folderName of pathParts) {
+            if (!folderName) continue;
+            const sanitizedFolderName = sanitizeName(folderName, keepOriginalNames);
+            currentDir = await currentDir.getDirectoryHandle(sanitizedFolderName, { create: true });
+          }
+        }
 
-      // Write to target folder (preserve original filename)
-      const newFileHandle = await currentDir.getFileHandle(photo.name, { create: true });
-      const writable = await newFileHandle.createWritable();
-      await writable.write(arrayBuffer);
-      await writable.close();
+        // 确保文件对象存在
+        if (!photo.file) {
+          console.warn(`跳过没有文件对象的图片: ${photo.name}`);
+          errors.push({ file: photo.name, error: '文件对象不存在' });
+          continue;
+        }
 
-      exported++;
-      if (onProgress) {
-        onProgress({ current: exported, total: photos.length });
+        // Read file content
+        const arrayBuffer = await photo.file.arrayBuffer();
+
+        // Write to target folder
+        const sanitizedFileName = sanitizeName(photo.name, keepOriginalNames);
+
+        // 检查文件是否已存在，如果存在则添加数字后缀
+        let finalFileName = sanitizedFileName;
+        let counter = 1;
+        while (true) {
+          try {
+            const existingFile = await currentDir.getFileHandle(finalFileName);
+            // 文件存在，添加数字后缀
+            const ext = sanitizedFileName.match(/\.[^.]+$/)?.[0] || '';
+            const nameWithoutExt = sanitizedFileName.slice(0, -ext.length);
+            finalFileName = `${nameWithoutExt}_${counter}${ext}`;
+            counter++;
+          } catch {
+            // 文件不存在，可以使用这个文件名
+            break;
+          }
+        }
+
+        const newFileHandle = await currentDir.getFileHandle(finalFileName, { create: true });
+        const writable = await newFileHandle.createWritable();
+        await writable.write(arrayBuffer);
+        await writable.close();
+
+        exported++;
+        if (onProgress) {
+          onProgress({ current: exported, total: photos.length });
+        }
+      } catch (fileError) {
+        console.error(`导出文件失败: ${photo.name}`, fileError);
+        errors.push({ file: photo.name, error: fileError.message });
+        // 继续处理其他文件
       }
     }
 
     return {
       exported,
       total: photos.length,
-      folderName: targetDir.name
+      folderName: targetDir.name,
+      errors: errors.length > 0 ? errors : null
     };
   } catch (error) {
     if (error.name === 'AbortError') {
-      return { exported: 0, total: 0, folderName: null };
+      return { exported: 0, total: 0, folderName: null, cancelled: true };
     }
     throw error;
   }

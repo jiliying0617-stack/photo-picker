@@ -12,6 +12,10 @@ function Exporter() {
     wrong: true,
     uncategorized: false
   });
+  const [exportOptions, setExportOptions] = useState({
+    keepOriginalNames: true,     // 保留原文件名
+    keepFolderStructure: true    // 保留文件夹结构
+  });
 
   const photos = usePhotoStore((state) => state.photos);
   const getStats = usePhotoStore((state) => state.getStats);
@@ -52,36 +56,58 @@ function Exporter() {
     setProgress({ current: 0, total: photosToExport.length });
 
     try {
-      const result = await exportPhotos(photosToExport, selectedCategories, (p) => {
-        setProgress(p);
-      });
+      const result = await exportPhotos(
+        photosToExport,
+        selectedCategories,
+        (p) => {
+          setProgress(p);
+        },
+        exportOptions
+      );
+
+      // 如果用户取消了选择
+      if (result.cancelled) {
+        alert('导出已取消');
+        return;
+      }
 
       if (result.exported > 0) {
         const exportedStats = [];
         if (selectedCategories.correct && stats.correct > 0) {
-          exportedStats.push(`· 正确/ - ${stats.correct} 张`);
+          exportedStats.push(`· 正确_Correct/ - ${stats.correct} 张`);
         }
         if (selectedCategories.medium && stats.medium > 0) {
-          exportedStats.push(`· 适中/ - ${stats.medium} 张`);
+          exportedStats.push(`· 适中_Medium/ - ${stats.medium} 张`);
         }
         if (selectedCategories.wrong && stats.wrong > 0) {
-          exportedStats.push(`· 错误/ - ${stats.wrong} 张`);
+          exportedStats.push(`· 错误_Wrong/ - ${stats.wrong} 张`);
         }
         if (selectedCategories.uncategorized && stats.uncategorized > 0) {
-          exportedStats.push(`· 未打标/ - ${stats.uncategorized} 张`);
+          exportedStats.push(`· 未标记_Uncategorized/ - ${stats.uncategorized} 张`);
         }
 
-        alert(
-          `导出完成!\n\n` +
+        let message = `导出完成!\n\n` +
           `成功导出: ${result.exported} / ${result.total} 张\n` +
           `目标文件夹: ${result.folderName}\n\n` +
           `已创建子文件夹:\n` +
-          exportedStats.join('\n')
-        );
+          exportedStats.join('\n');
+
+        // 如果有错误，显示错误信息
+        if (result.errors && result.errors.length > 0) {
+          message += `\n\n⚠️ 部分文件导出失败 (${result.errors.length} 个):\n`;
+          message += result.errors.slice(0, 5).map(e => `· ${e.file}: ${e.error}`).join('\n');
+          if (result.errors.length > 5) {
+            message += `\n· ... 还有 ${result.errors.length - 5} 个错误`;
+          }
+        }
+
+        alert(message);
+      } else {
+        alert('没有成功导出任何文件，请检查文件是否存在或浏览器权限设置。');
       }
     } catch (error) {
       console.error('导出失败:', error);
-      alert(`导出失败: ${error.message}`);
+      alert(`导出失败: ${error.message}\n\n请确保:\n1. 使用 Chrome 或 Edge 浏览器\n2. 授予了文件夹写入权限\n3. 磁盘空间充足`);
     } finally {
       setExporting(false);
       setProgress({ current: 0, total: 0 });
@@ -132,6 +158,37 @@ function Exporter() {
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800 mb-2">选择导出分类</h2>
               <p className="text-sm text-gray-500">保持原文件夹结构导出</p>
+            </div>
+
+            {/* 导出选项 */}
+            <div className="mb-6 p-4 neu-concave rounded-2xl">
+              <div className="text-sm font-medium text-gray-700 mb-3">导出选项</div>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={exportOptions.keepOriginalNames}
+                    onChange={(e) => setExportOptions(prev => ({ ...prev, keepOriginalNames: e.target.checked }))}
+                    className="w-5 h-5 rounded"
+                  />
+                  <div>
+                    <div className="text-sm text-gray-800">保留原文件名</div>
+                    <div className="text-xs text-gray-500">仅移除非法字符,保留中文和特殊符号</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={exportOptions.keepFolderStructure}
+                    onChange={(e) => setExportOptions(prev => ({ ...prev, keepFolderStructure: e.target.checked }))}
+                    className="w-5 h-5 rounded"
+                  />
+                  <div>
+                    <div className="text-sm text-gray-800">保留文件夹结构</div>
+                    <div className="text-xs text-gray-500">在分类文件夹下保持原始目录层级</div>
+                  </div>
+                </label>
+              </div>
             </div>
 
             {/* 分类选项 */}

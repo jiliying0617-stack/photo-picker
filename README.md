@@ -1,157 +1,165 @@
-# Photo Picker
+# 筛图工具
 
-**Fast photo sorting that doesn't waste your time.**
+**不浪费时间的照片筛选神器。**
 
-Built for photographers who have better things to do than fight with software.
-
----
-
-## What It Does
-
-Import 10,000 photos. Sort them with three keys. Export the good ones. That's it.
-
-- **Fast** - Zero lag. Instant response. No loading screens.
-- **Simple** - A/S/D keys. Done. No 50-button UI nightmare.
-- **Compare** - Side-by-side folders, auto-aligned by filename.
-- **Local** - Your photos stay on your machine. Period.
-- **Persistent** - Close the tab, come back next week. Nothing's lost.
+给不想和软件较劲的摄影师用的。
 
 ---
 
-## How to Use
+## 它做什么
 
-### Quick Start
+导入 10,000 张照片。用三个键分类。导出好的。就这么简单。
+
+- **快** - 零延迟。即时响应。没有加载屏幕。
+- **简单** - 1/2/3 三个键。搞定。不是 50 个按钮的灾难。
+- **对比** - 文件夹并排，按文件名自动对齐。
+- **本地** - 照片不离开你的电脑。句号。
+- **持久** - 关掉标签页，下周回来。什么都没丢。
+
+---
+
+## 怎么用
+
+### 快速开始
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `localhost:5173`. Drag in a folder. Start pressing A/S/D.
+打开 `localhost:5173`。拖个文件夹进去。开始按 1/2/3。
 
-### Keyboard Controls
+### 键盘操作
 
-The only thing you need to remember:
+你只需要记住这些:
 
-- `A` → Keep (✓)
-- `S` → Maybe (~)
-- `D` → Trash (✕)
-- `X` → Clear mark
-- `←/→` → Navigate
+- `1` → 正确 (✓)
+- `2` → 适中 (~)
+- `3` → 错误 (✕)
+- `0/X` → 清除标记
+- `←/→` → 翻页
 
-**No mouse required.**
+**不需要鼠标。**
 
-### Compare Mode
+### 对比模式
 
-1. Select 2-8 folders from the sidebar
-2. Photos auto-align by filename
-3. Missing files show as placeholders
+1. 左侧选择 2-8 个文件夹
+2. 照片按文件名自动对齐
+3. 缺失的文件显示占位符
 
-Perfect for RAW vs JPEG comparison or reviewing multiple takes.
+适合对比 RAW vs JPEG，或者多机位照片。
 
-### Export
+### 导出
 
-1. Click "Export"
-2. Choose which categories to save
-3. Select destination folder
-4. Done
+1. 点击"导出"
+2. 选择导出选项:
+   - **保留原文件名**: 保留中文和特殊符号,仅移除非法字符
+   - **保留文件夹结构**: 在分类文件夹下保持原始目录层级
+3. 勾选要导出的分类
+4. 选择目标文件夹
+5. 完成
 
-Exported structure preserves your original folders:
+导出结构示例:
 ```
-Output/
-├── Keep/
-│   └── (original folder structure)
-├── Maybe/
-├── Trash/
-└── Unmarked/
+输出目录/
+├── 正确_Correct/
+│   └── (原文件夹结构)
+├── 适中_Medium/
+├── 错误_Wrong/
+└── 未标记_Uncategorized/
 ```
 
----
-
-## Tech Stack (If You Care)
-
-- **React 19** - Fast when not abused
-- **Zustand** - State without ceremony
-- **Vite** - Build tool that doesn't waste time
-- **IndexedDB** - Local storage that scales
-- **Tailwind** - CSS without fighting
-
-No TypeScript bloat. No Redux complexity. No framework churn. Just working code.
+**新特性**:
+- ✅ 智能处理文件名中的特殊字符
+- ✅ 自动避免文件名冲突（添加数字后缀）
+- ✅ 详细的导出进度和错误报告
 
 ---
 
-## Performance
+## 技术栈 (如果你在乎的话)
 
-This tool is optimized where it matters:
+- **React 19** - 不滥用就快
+- **Zustand** - 不装逼的状态管理
+- **Vite** - 不浪费时间的构建工具
+- **IndexedDB** - 能扛得住的本地存储
+- **Tailwind** - 不打架的 CSS
 
-- ✅ **Memory leak fixed** - Object URLs properly managed
-- ✅ **O(n²) → O(n)** - Compare mode uses lookup tables
-- ✅ **5x faster I/O** - Parallel IndexedDB writes
-- ✅ **Zero lag** - Incremental updates, no full rebuilds
-
-Not theory. Measured. Tested with 10,000+ photos.
+没有 TypeScript 臃肿。没有 Redux 复杂度。没有框架换来换去。就是能用的代码。
 
 ---
 
-## Browser Support
+## 性能
+
+该优化的地方都优化了:
+
+- ✅ **内存泄漏修复** - Object URL 正确管理
+- ✅ **O(n²) → O(n)** - 对比模式用查找表
+- ✅ **5倍 I/O 速度** - IndexedDB 并行写入
+- ✅ **零延迟** - 增量更新，不全量重建
+
+不是理论。实测。用 10,000+ 张照片测的。
+
+---
+
+## 浏览器支持
 
 **Chrome/Edge 86+**
 
-Why not Firefox/Safari? They don't support File System Access API. I'm not writing polyfills for 5-year-old features.
+为什么不支持 Firefox/Safari？因为它们不支持 File System Access API。我不写 polyfill 来兼容 5 年前就该支持的功能。
 
-Use a modern browser or this won't work. Your choice.
-
----
-
-## Philosophy
-
-This tool follows three rules:
-
-1. **Fast is better than slow**
-   - Instant feedback on every action
-   - No artificial delays or loading screens
-
-2. **Simple is better than complex**
-   - Three keys to remember
-   - One job to do well
-
-3. **Reliable is better than clever**
-   - Your data doesn't disappear
-   - Edge cases are handled
-   - Memory doesn't leak
-
-If a feature doesn't serve these goals, it doesn't belong here.
+用现代浏览器，或者别用。你选。
 
 ---
 
-## Contributing
+## 设计哲学
 
-Sure. Follow these rules:
+这个工具遵循三条规则:
 
-1. **Read the code first** - If you can't understand a function in 10 seconds, it's written wrong
-2. **Keep it simple** - No clever tricks. Boring code is good code
-3. **Don't break things** - Backwards compatibility matters
-4. **Measure performance** - "Should be faster" isn't good enough
+1. **快 > 慢**
+   - 每个操作都即时反馈
+   - 没有人工延迟或加载屏幕
 
-Pull requests welcome. Bad code isn't.
+2. **简单 > 复杂**
+   - 三个键就够了
+   - 一件事做好就行
 
----
+3. **可靠 > 聪明**
+   - 数据不会丢
+   - 边界情况都处理了
+   - 内存不泄漏
 
-## License
-
-MIT. Do whatever you want.
-
----
-
-## Credits
-
-Optimized following Linus Torvalds' philosophy:
-- "Bad programmers worry about code. Good programmers worry about data structures."
-- "Talk is cheap. Show me the code."
-- "If you need more than 3 levels of indentation, you're screwed."
-
-Built with Claude Code by Anthropic.
+不符合这三条的功能，不属于这里。
 
 ---
 
-**Now stop reading and go sort some photos.**
+## 贡献代码
+
+可以。遵守这些规则:
+
+1. **先读代码** - 如果一个函数 10 秒看不懂，说明写得有问题
+2. **保持简单** - 不耍聪明。无聊的代码是好代码
+3. **别搞坏东西** - 向后兼容很重要
+4. **测性能** - "应该快一点"不够，要测
+
+欢迎 Pull Request。垃圾代码不要。
+
+---
+
+## 开源协议
+
+MIT。随便用。
+
+---
+
+## 致谢
+
+遵循 Linus Torvalds 的哲学优化:
+- "糟糕的程序员担心代码。优秀的程序员担心数据结构。"
+- "废话少说。给我看代码。"
+- "如果你需要超过 3 层缩进，你就完蛋了。"
+
+用 Claude Code by Anthropic 构建。
+
+---
+
+**别看了，去筛图吧。**
