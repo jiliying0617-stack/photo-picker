@@ -441,13 +441,59 @@ function App() {
             style={{ gridTemplateColumns: `repeat(${compareColumns}, 1fr)` }}
           >
             {displayPhotosWithUrls.map((photo, idx) => {
-              // 处理占位符
+              // 处理占位符 - 支持点选和预览
               if (!photo) {
+                const placeholderId = `placeholder-${idx}`;
+                const isPlaceholderSelected = selectedPhotos.includes(placeholderId);
+
+                const handlePlaceholderClick = (e) => {
+                  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                    // 框选模式
+                    e.preventDefault();
+                    setSelectedPhotos(prev =>
+                      prev.includes(placeholderId)
+                        ? prev.filter(id => id !== placeholderId)
+                        : [...prev, placeholderId]
+                    );
+                  }
+                };
+
+                const handlePlaceholderDoubleClick = () => {
+                  // 双击打开预览整组（包括占位符）
+                  if (selectedPhotos.length > 0) {
+                    // 如果有框选的图片，预览所有框选的
+                    const photosToPreview = displayPhotosWithUrls.filter((p, i) =>
+                      p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
+                    );
+                    setPreviewPhotos(photosToPreview);
+                  } else {
+                    // 否则预览当前组（对比模式下通常是一行）
+                    const rowStartIdx = Math.floor(idx / compareColumns) * compareColumns;
+                    const rowPhotos = displayPhotosWithUrls.slice(rowStartIdx, rowStartIdx + compareColumns);
+                    setPreviewPhotos(rowPhotos);
+                  }
+                };
+
                 return (
-                  <div key={`placeholder-${idx}`} className="neu-card rounded-2xl overflow-hidden">
-                    <div className="aspect-square flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 neu-concave">
+                  <div
+                    key={placeholderId}
+                    className={`neu-card rounded-2xl overflow-hidden cursor-pointer transition-all ${
+                      isPlaceholderSelected ? 'ring-4 ring-blue-500' : ''
+                    }`}
+                    onClick={handlePlaceholderClick}
+                    onDoubleClick={handlePlaceholderDoubleClick}
+                  >
+                    {isPlaceholderSelected && (
+                      <div className="absolute top-2 left-2 bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10">
+                        ✓
+                      </div>
+                    )}
+                    <div className="aspect-square flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 neu-concave relative">
                       <div className="text-6xl mb-3 opacity-20">📷</div>
                       <div className="text-gray-400 text-xs font-medium">此文件夹无此图片</div>
+                      <div className="absolute bottom-2 text-gray-300 text-[10px]">
+                        点击选择 · 双击预览
+                      </div>
                     </div>
                   </div>
                 );
@@ -607,7 +653,10 @@ function App() {
                 </div>
                 <button
                   onClick={() => {
-                    const photosToPreview = displayPhotosWithUrls.filter(p => p && selectedPhotos.includes(p.id));
+                    // 包含真实图片和占位符
+                    const photosToPreview = displayPhotosWithUrls.filter((p, i) =>
+                      p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
+                    );
                     setPreviewPhotos(photosToPreview);
                   }}
                   className="px-4 py-2 neu-button rounded-lg text-blue-600 text-sm font-medium"
