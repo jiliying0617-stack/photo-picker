@@ -2,6 +2,7 @@ import usePhotoStore from '../store/usePhotoStore';
 
 function StatusBar() {
   const getStats = usePhotoStore((state) => state.getStats);
+  const photos = usePhotoStore((state) => state.photos);
   const stats = getStats();
 
   if (stats.total === 0) {
@@ -12,6 +13,10 @@ function StatusBar() {
     if (total === 0) return '0';
     return ((count / total) * 100).toFixed(0);
   };
+
+  // 检查是否有图片缺少文件对象
+  const photosWithoutFile = photos.filter(p => !p.file).length;
+  const hasWarning = photosWithoutFile > 0;
 
   return (
     <div className="bg-[#e0e5ec] px-8 py-4">
@@ -51,18 +56,30 @@ function StatusBar() {
 
         {/* 快捷键提示 - 极速模式 */}
         <div className="text-xs text-gray-400 font-light flex items-center gap-3">
-          <span className="text-blue-600 font-medium">⚡ 极速模式</span>
-          <span className="text-gray-400">·</span>
-          <kbd className="neu-convex px-2 py-1 rounded text-green-600 font-medium">1</kbd>
-          <kbd className="neu-convex px-2 py-1 rounded text-yellow-600 font-medium">2</kbd>
-          <kbd className="neu-convex px-2 py-1 rounded text-red-600 font-medium">3</kbd>
-          <span className="text-gray-400">·</span>
-          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">X</kbd>
-          <span>取消</span>
-          <span className="text-gray-400">·</span>
-          <kbd className="neu-convex px-2 py-1 rounded text-gray-600">←→</kbd>
-          <span>切换</span>
-          <span className="text-gray-400 ml-2">(Shift/Ctrl多选)</span>
+          {hasWarning ? (
+            <>
+              <span className="text-orange-600 font-medium flex items-center gap-2">
+                ⚠️ {photosWithoutFile} 张图片缺少文件
+              </span>
+              <span className="text-gray-400">·</span>
+              <span className="text-orange-500">需要重新导入文件夹才能导出</span>
+            </>
+          ) : (
+            <>
+              <span className="text-blue-600 font-medium">⚡ 极速模式</span>
+              <span className="text-gray-400">·</span>
+              <kbd className="neu-convex px-2 py-1 rounded text-green-600 font-medium">1</kbd>
+              <kbd className="neu-convex px-2 py-1 rounded text-yellow-600 font-medium">2</kbd>
+              <kbd className="neu-convex px-2 py-1 rounded text-red-600 font-medium">3</kbd>
+              <span className="text-gray-400">·</span>
+              <kbd className="neu-convex px-2 py-1 rounded text-gray-600">X</kbd>
+              <span>取消</span>
+              <span className="text-gray-400">·</span>
+              <kbd className="neu-convex px-2 py-1 rounded text-gray-600">←→</kbd>
+              <span>切换</span>
+              <span className="text-gray-400 ml-2">(Shift/Ctrl多选)</span>
+            </>
+          )}
         </div>
       </div>
     </div>

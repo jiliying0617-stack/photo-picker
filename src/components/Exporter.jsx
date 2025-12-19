@@ -51,6 +51,22 @@ function Exporter() {
       return;
     }
 
+    // 检查文件对象是否存在
+    const photosWithoutFile = photosToExport.filter(p => !p.file);
+    if (photosWithoutFile.length > 0) {
+      const missingRatio = Math.round((photosWithoutFile.length / photosToExport.length) * 100);
+      if (!confirm(
+        `警告: 检测到 ${photosWithoutFile.length} 张图片缺少文件对象 (${missingRatio}%)\n\n` +
+        `可能原因:\n` +
+        `· 刷新页面后需要重新导入文件夹\n` +
+        `· 部分图片在导入时读取失败\n\n` +
+        `建议: 重新导入文件夹后再导出\n\n` +
+        `是否继续导出? (只会导出有文件对象的 ${photosToExport.length - photosWithoutFile.length} 张图片)`
+      )) {
+        return;
+      }
+    }
+
     setShowModal(false);
     setExporting(true);
     setProgress({ current: 0, total: photosToExport.length });
