@@ -46,9 +46,11 @@ function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
   }, [photosWithUrls]);
 
   // 计算当前组在所有图片中的位置
+  // 重要：不过滤 null，保持占位符，确保每组大小固定
   const photosPerGroup = photosWithUrls.photos.length;
-  const currentGroupIndex = allPhotos ? Math.floor(allPhotos.findIndex(p => p && p.id === photosWithUrls.photos[0]?.id) / photosPerGroup) : 0;
-  const totalGroups = allPhotos ? Math.ceil(allPhotos.filter(p => p).length / photosPerGroup) : 1;
+  const firstRealPhoto = photosWithUrls.photos.find(p => p);
+  const currentGroupIndex = allPhotos && firstRealPhoto ? Math.floor(allPhotos.findIndex(p => p && p.id === firstRealPhoto.id) / photosPerGroup) : 0;
+  const totalGroups = allPhotos ? Math.ceil(allPhotos.length / photosPerGroup) : 1;
 
   // 性能优化: 使用 ref 存储所有图片元素和当前位置
   const imagesRef = useRef([]);
@@ -61,27 +63,27 @@ function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
   }, [pan]);
 
   // 切换到下一组
+  // 重要：不过滤 null，保持占位符，严格按组顺序切换
   const handleNextGroup = useCallback(() => {
     if (!allPhotos || !onGroupChange) return;
 
     const nextGroupStartIndex = (currentGroupIndex + 1) * photosPerGroup;
-    if (nextGroupStartIndex < allPhotos.filter(p => p).length) {
-      const nextGroupPhotos = allPhotos
-        .filter(p => p)
-        .slice(nextGroupStartIndex, nextGroupStartIndex + photosPerGroup);
+    if (nextGroupStartIndex < allPhotos.length) {
+      // 不过滤 null，直接切片，保持占位符
+      const nextGroupPhotos = allPhotos.slice(nextGroupStartIndex, nextGroupStartIndex + photosPerGroup);
       onGroupChange(nextGroupPhotos);
     }
   }, [allPhotos, onGroupChange, currentGroupIndex, photosPerGroup]);
 
   // 切换到上一组
+  // 重要：不过滤 null，保持占位符，严格按组顺序切换
   const handlePrevGroup = useCallback(() => {
     if (!allPhotos || !onGroupChange) return;
 
     if (currentGroupIndex > 0) {
       const prevGroupStartIndex = (currentGroupIndex - 1) * photosPerGroup;
-      const prevGroupPhotos = allPhotos
-        .filter(p => p)
-        .slice(prevGroupStartIndex, prevGroupStartIndex + photosPerGroup);
+      // 不过滤 null，直接切片，保持占位符
+      const prevGroupPhotos = allPhotos.slice(prevGroupStartIndex, prevGroupStartIndex + photosPerGroup);
       onGroupChange(prevGroupPhotos);
     }
   }, [allPhotos, onGroupChange, currentGroupIndex, photosPerGroup]);
@@ -335,6 +337,25 @@ function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
           }}
         >
           {photosWithUrls.photos.map((photo, idx) => {
+            // 处理占位符（null）情况
+            if (!photo) {
+              return (
+                <div
+                  key={`placeholder-${idx}`}
+                  className="relative bg-gray-900 overflow-hidden flex items-center justify-center"
+                >
+                  <div className="text-center">
+                    <div className="text-6xl mb-3 opacity-20">📷</div>
+                    <div className="text-gray-500 text-sm font-medium">此文件夹无此图片</div>
+                  </div>
+                  {/* 图片序号 */}
+                  <div className="absolute top-3 left-3 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold z-10">
+                    {idx + 1}
+                  </div>
+                </div>
+              );
+            }
+
             // 从 store 中获取实时分类状态
             const storePhoto = storePhotos.find(p => p.id === photo.id);
             const currentCategory = storePhoto ? storePhoto.category : photo.category;
