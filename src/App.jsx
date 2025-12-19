@@ -4,6 +4,7 @@ import Toolbar from './components/Toolbar';
 import StatusBar from './components/StatusBar';
 import FolderPanel from './components/FolderPanel';
 import LightboxPreview from './components/LightboxPreview';
+import { getFileFormat, getFormatBadgeColor } from './utils/imageUtils';
 
 function App() {
   const photos = usePhotoStore((state) => state.photos);
@@ -18,7 +19,6 @@ function App() {
   const [filter, setFilter] = useState({ category: null, folders: [] }); // 简化：用对象代替函数
   const [selectedFolders, setSelectedFolders] = useState([]);
   const [selectedPhotos, setSelectedPhotos] = useState([]); // 框选的图片
-  const [isSelecting, setIsSelecting] = useState(false); // 是否处于框选模式
   const [previewPhotos, setPreviewPhotos] = useState(null); // 预览的图片列表
   const [isDragging, setIsDragging] = useState(false); // 是否正在拖放
   const [objectUrls, setObjectUrls] = useState(new Map()); // 管理 Object URLs 生命周期
@@ -43,21 +43,35 @@ function App() {
   // 对比模式下的图片排列 - 按选择顺序排列
   const displayPhotos = useMemo(() => {
     if (isCompareMode) {
-      // 利用 folderMap 快速查找，避免 O(n²) 遍历
-      const folderPhotoGroups = selectedFolders.map(folderPath => {
+      // 利用双重保险机制确保找到所有图片
+      const folderPhotoGroups = selectedFolders.map((folderPath) => {
         const photosInFolder = [];
-        // 查找该文件夹及其子文件夹的所有图片
-        // 修复：精确匹配路径，避免误匹配
-        Object.keys(folderMap).forEach(mapFolder => {
-          // 兼容相对路径和绝对路径
-          // 确保是完整路径匹配：以 / 或路径分隔符结尾
-          const normalizedMapFolder = mapFolder.replace(/\\/g, '/');
-          const normalizedFolderPath = folderPath.replace(/\\/g, '/');
+        const photoIdSet = new Set(); // 用于去重
 
-          if (normalizedMapFolder === normalizedFolderPath ||
-              normalizedMapFolder.endsWith('/' + normalizedFolderPath) ||
-              normalizedMapFolder.endsWith(normalizedFolderPath)) {
-            photosInFolder.push(...folderMap[mapFolder]);
+        // 标准化路径（统一分隔符）
+        const normalizedFolderPath = folderPath.replace(/\\/g, '/');
+
+        // 方法1: 直接从 folderMap 精确查找（最快）
+        if (folderMap[folderPath]) {
+          folderMap[folderPath].forEach(photo => {
+            photoIdSet.add(photo.id);
+            photosInFolder.push(photo);
+          });
+        }
+
+        // 方法2: 遍历所有照片，确保不遗漏（兜底方案）
+        // 即使方法1找到了图片，也执行方法2以防 folderMap 不完整
+        photos.forEach(photo => {
+          if (photoIdSet.has(photo.id)) return; // 已经添加过，跳过
+
+          const photoFolder = photo.path.split('/').slice(0, -1).join('/');
+          const normalizedPhotoFolder = photoFolder.replace(/\\/g, '/');
+
+          // 精确匹配或子文件夹匹配（不区分大小写）
+          if (normalizedPhotoFolder.toLowerCase() === normalizedFolderPath.toLowerCase() ||
+              normalizedPhotoFolder.toLowerCase().startsWith(normalizedFolderPath.toLowerCase() + '/')) {
+            photoIdSet.add(photo.id);
+            photosInFolder.push(photo);
           }
         });
 
@@ -66,32 +80,41 @@ function App() {
           if (filter.category && p.category !== filter.category) return false;
           return true;
         });
-        // 保持文件夹内部的顺序（不排序）
+
+        // 按文件名排序
         return filtered.sort((a, b) => a.name.localeCompare(b.name));
       });
 
-      // 使用第一个文件夹的图片顺序作为基准（不自动排序）
-      const baseGroup = folderPhotoGroups[0] || [];
-      const baseNames = baseGroup.map(p => p.name);
+      // 辅助函数：获取不含扩展名的文件名
+      const getBaseName = (filename) => {
+        const lastDot = filename.lastIndexOf('.');
+        return lastDot > 0 ? filename.substring(0, lastDot) : filename;
+      };
 
-      // 收集其他文件夹中的额外文件名
+      // 使用第一个文件夹的图片顺序作为基准
+      const baseGroup = folderPhotoGroups[0] || [];
+      const baseNames = baseGroup.map(p => getBaseName(p.name));
+
+      // 收集其他文件夹中的额外文件名（忽略扩展名）
       const additionalNames = new Set();
-      folderPhotoGroups.slice(1).forEach(group => {
+      folderPhotoGroups.slice(1).forEach((group) => {
         group.forEach(p => {
-          if (!baseNames.includes(p.name)) {
-            additionalNames.add(p.name);
+          const baseName = getBaseName(p.name);
+          if (!baseNames.includes(baseName)) {
+            additionalNames.add(baseName);
           }
         });
       });
 
       // 最终顺序：基准文件夹的顺序 + 其他文件夹的额外图片
-      const orderedNames = [...baseNames, ...Array.from(additionalNames).sort()];
+      const orderedBaseNames = [...baseNames, ...Array.from(additionalNames).sort()];
 
-      // 构建对比列表 - 按照选定的顺序对齐
+      // 构建对比列表 - 按照选定的顺序对齐（忽略扩展名匹配）
       const alignedPhotos = [];
-      orderedNames.forEach(name => {
-        folderPhotoGroups.forEach(group => {
-          const photo = group.find(p => p.name === name);
+
+      orderedBaseNames.forEach(baseName => {
+        folderPhotoGroups.forEach((group) => {
+          const photo = group.find(p => getBaseName(p.name) === baseName);
           alignedPhotos.push(photo || null); // null 作为占位符
         });
       });
@@ -103,39 +126,51 @@ function App() {
     }
   }, [isCompareMode, selectedFolders, folderMap, filter, filteredPhotos, displayCount, compareColumns]);
 
-  // 管理 Object URLs 生命周期 - 修复内存泄漏
+  // 管理 Object URLs 生命周期 - 基于全部照片，而非当前显示的照片
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    const newUrls = new Map();
-
-    displayPhotos.forEach(photo => {
-      if (photo && !photo.thumbnailUrl && photo.file) {
-        const url = URL.createObjectURL(photo.file);
-        newUrls.set(photo.id, url);
-      }
-    });
-
     setObjectUrls(prevUrls => {
-      // 清理旧的 URLs
-      prevUrls.forEach((url, id) => {
-        if (!newUrls.has(id)) {
-          URL.revokeObjectURL(url);
+      const newUrls = new Map(prevUrls);
+      const allPhotoIds = new Set(photos.map(p => p.id));
+
+      // 为所有需要的照片创建 URL
+      displayPhotos.forEach(photo => {
+        if (photo && photo.file && !newUrls.has(photo.id)) {
+          const url = URL.createObjectURL(photo.file);
+          newUrls.set(photo.id, url);
         }
       });
+
+      // 只清理已经从 photos 数组中删除的 URL
+      const idsToRemove = [];
+      newUrls.forEach((url, id) => {
+        if (!allPhotoIds.has(id)) {
+          URL.revokeObjectURL(url);
+          idsToRemove.push(id);
+        }
+      });
+      idsToRemove.forEach(id => newUrls.delete(id));
+
       return newUrls;
     });
+  }, [displayPhotos, photos]);
 
-    // 组件卸载时清理所有 URLs
+  // 组件卸载时清理所有 URLs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
     return () => {
-      newUrls.forEach(url => URL.revokeObjectURL(url));
+      objectUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [displayPhotos]);
+  }, []);
 
   // 为显示的图片附加 URL - 优化：避免创建新对象，直接使用原对象
   const displayPhotosWithUrls = useMemo(() => {
     return displayPhotos.map(photo => {
       if (!photo) return null;
       // 如果已经有 thumbnailUrl，直接返回原对象
-      if (photo.thumbnailUrl) return photo;
+      if (photo.thumbnailUrl) {
+        return photo;
+      }
 
       const url = objectUrls.get(photo.id);
       if (url) {
@@ -163,6 +198,7 @@ function App() {
   }, [filteredPhotos.length]);
 
   // 当过滤变化时重置显示数量
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setDisplayCount(100);
   }, [filter]);
@@ -426,11 +462,14 @@ function App() {
               };
               const config = photo.category ? categoryIcons[photo.category] : null;
 
+              // 获取文件格式信息
+              const fileFormat = getFileFormat(photo.name);
+              const formatColors = getFormatBadgeColor(fileFormat);
+
               const handlePhotoClick = (e) => {
                 if (e.shiftKey || e.ctrlKey || e.metaKey) {
                   // 框选模式
                   e.preventDefault();
-                  setIsSelecting(true);
                   setSelectedPhotos(prev =>
                     prev.includes(photo.id)
                       ? prev.filter(id => id !== photo.id)
@@ -483,14 +522,27 @@ function App() {
                       ${isSelected ? 'scale-95' : 'hover:scale-105'}
                     `}
                   >
-                    <div className="aspect-square neu-concave rounded-xl overflow-hidden">
+                    <div className="aspect-square neu-concave rounded-xl overflow-hidden bg-gray-100">
                       <img
                         src={photo.thumbnailUrl}
                         alt={photo.name}
                         loading="lazy"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     </div>
+
+                    {/* 文件格式角标 - 左上角 */}
+                    {isCompareMode && (
+                      <div
+                        className={`
+                          absolute top-2 left-2 px-2 py-1 rounded-md
+                          text-xs font-bold shadow-lg
+                          ${formatColors.bg} ${formatColors.text}
+                        `}
+                      >
+                        {fileFormat}
+                      </div>
+                    )}
 
                     {config && (
                       <div

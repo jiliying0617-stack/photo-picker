@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 import { importFolder, importFolderFromDrop, isFileSystemAccessSupported } from '../utils/fileSystem';
 
-function FileImporter() {
+const FileImporter = memo(function FileImporter() {
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const setPhotos = usePhotoStore((state) => state.setPhotos);
@@ -109,6 +109,6 @@ function FileImporter() {
       )}
     </div>
   );
-}
+});
 
 export default FileImporter;

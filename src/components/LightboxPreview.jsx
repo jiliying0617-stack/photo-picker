@@ -1,35 +1,53 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 
-function LightboxPreview({ photos, initialIndex, onClose, allPhotos, onGroupChange }) {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
   const [scale, setScale] = useState(1); // 图片缩放比例
   const [pan, setPan] = useState({ x: 0, y: 0 }); // 图片平移位置
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [flashMessage, setFlashMessage] = useState(null); // 标签切换提示
+  const [contextMenu, setContextMenu] = useState(null); // 右键菜单 { x, y, photoId }
   const setCategory = usePhotoStore((state) => state.setCategory);
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
 
   // 延迟创建所有照片的缩略图 URL (只在 Lightbox 打开时创建)
   const photosWithUrls = useMemo(() => {
-    return photos.map(photo => {
+    const urls = [];
+    const result = photos.map(photo => {
       if (photo.thumbnailUrl) {
         return photo;
       }
       if (photo.file) {
+        const url = URL.createObjectURL(photo.file);
+        urls.push(url);
         return {
           ...photo,
-          thumbnailUrl: URL.createObjectURL(photo.file)
+          thumbnailUrl: url
         };
       }
       return photo;
     });
+
+    // 清理函数
+    return {
+      photos: result,
+      cleanup: () => urls.forEach(url => URL.revokeObjectURL(url))
+    };
   }, [photos]);
 
+  // 组件卸载或 photos 改变时清理 URLs
+  useEffect(() => {
+    return () => {
+      if (photosWithUrls.cleanup) {
+        photosWithUrls.cleanup();
+      }
+    };
+  }, [photosWithUrls]);
+
   // 计算当前组在所有图片中的位置
-  const photosPerGroup = photos.length;
-  const currentGroupIndex = allPhotos ? Math.floor(allPhotos.findIndex(p => p && p.id === photos[0]?.id) / photosPerGroup) : 0;
+  const photosPerGroup = photosWithUrls.photos.length;
+  const currentGroupIndex = allPhotos ? Math.floor(allPhotos.findIndex(p => p && p.id === photosWithUrls.photos[0]?.id) / photosPerGroup) : 0;
   const totalGroups = allPhotos ? Math.ceil(allPhotos.filter(p => p).length / photosPerGroup) : 1;
 
   // 性能优化: 使用 ref 存储所有图片元素和当前位置
@@ -68,30 +86,58 @@ function LightboxPreview({ photos, initialIndex, onClose, allPhotos, onGroupChan
     }
   }, [allPhotos, onGroupChange, currentGroupIndex, photosPerGroup]);
 
+  // 点击其他地方关闭右键菜单
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      window.addEventListener('click', handleClick);
+      return () => window.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
+
+  // 批量设置分类
+  const handleCategoryAll = useCallback((category) => {
+    photos.forEach(photo => {
+      setCategory(photo.id, category);
+    });
+
+    // 显示视觉反馈
+    const messages = {
+      correct: { text: '✓ 已标记为正确', color: 'bg-green-600' },
+      medium: { text: '~ 已标记为适中', color: 'bg-yellow-600' },
+      wrong: { text: '✕ 已标记为错误', color: 'bg-red-600' },
+      null: { text: '已清除标记', color: 'bg-gray-600' }
+    };
+
+    const message = messages[category];
+    if (message) {
+      setFlashMessage(message);
+      setTimeout(() => setFlashMessage(null), 1500); // 1.5秒后消失
+    }
+  }, [photos, setCategory]);
+
   // 键盘快捷键
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (contextMenu) {
+          setContextMenu(null);
+        } else {
+          onClose();
+        }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         handlePrevGroup();
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         handleNextGroup();
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        setCurrentIndex(prev => Math.max(0, prev - 1));
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        setCurrentIndex(prev => Math.min(photos.length - 1, prev + 1));
-      } else if (e.key === 'a' || e.key === 'A') {
+      } else if (e.key === '1') {
         e.preventDefault();
         handleCategoryAll('correct');
-      } else if (e.key === 's' || e.key === 'S') {
+      } else if (e.key === '2') {
         e.preventDefault();
         handleCategoryAll('medium');
-      } else if (e.key === 'd' || e.key === 'D') {
+      } else if (e.key === '3') {
         e.preventDefault();
         handleCategoryAll('wrong');
       } else if (e.key === '0' || e.key === 'x' || e.key === 'X') {
@@ -106,7 +152,7 @@ function LightboxPreview({ photos, initialIndex, onClose, allPhotos, onGroupChan
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [photos.length, onClose, handleNextGroup, handlePrevGroup]);
+  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu]);
 
   // 鼠标滚轮缩放
   useEffect(() => {
@@ -186,40 +232,20 @@ function LightboxPreview({ photos, initialIndex, onClose, allPhotos, onGroupChan
     };
   }, [isPanning, startPan, scale, updateAllImagesTransform]);
 
-  const handleCategoryAll = (category) => {
-    photos.forEach(photo => {
-      setCategory(photo.id, category);
-    });
-
-    // 显示视觉反馈
-    const messages = {
-      correct: { text: '✓ 已标记为正确', color: 'bg-green-600' },
-      medium: { text: '~ 已标记为适中', color: 'bg-yellow-600' },
-      wrong: { text: '✕ 已标记为错误', color: 'bg-red-600' },
-      null: { text: '已清除标记', color: 'bg-gray-600' }
-    };
-
-    const message = messages[category];
-    if (message) {
-      setFlashMessage(message);
-      setTimeout(() => setFlashMessage(null), 1500); // 1.5秒后消失
-    }
-  };
-
   const categoryIcons = {
     correct: { icon: '✓', color: 'bg-green-600', text: '正确' },
     medium: { icon: '~', color: 'bg-yellow-600', text: '适中' },
     wrong: { icon: '✕', color: 'bg-red-600', text: '错误' },
   };
 
-  const columnsCount = Math.min(photos.length, 4);
+  const columnsCount = Math.min(photosWithUrls.photos.length, 4);
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* 顶部工具栏 - 固定高度 */}
       <div className="h-14 bg-black/80 flex items-center justify-between px-6 flex-shrink-0">
         <div className="text-white text-sm flex items-center gap-6">
-          <span>对比预览 · {photos.length} 张图片</span>
+          <span>对比预览 · {photosWithUrls.photos.length} 张图片</span>
           {allPhotos && totalGroups > 1 && (
             <span className="text-purple-400">
               第 {currentGroupIndex + 1} / {totalGroups} 组
@@ -308,11 +334,20 @@ function LightboxPreview({ photos, initialIndex, onClose, allPhotos, onGroupChan
             gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
           }}
         >
-          {photosWithUrls.map((photo, idx) => {
+          {photosWithUrls.photos.map((photo, idx) => {
             // 从 store 中获取实时分类状态
             const storePhoto = storePhotos.find(p => p.id === photo.id);
             const currentCategory = storePhoto ? storePhoto.category : photo.category;
             const config = currentCategory ? categoryIcons[currentCategory] : null;
+
+            const handleContextMenu = (e) => {
+              e.preventDefault();
+              setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                photoId: photo.id
+              });
+            };
 
             return (
               <div
@@ -320,6 +355,7 @@ function LightboxPreview({ photos, initialIndex, onClose, allPhotos, onGroupChan
                 className="relative bg-black overflow-hidden"
                 style={{ cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
                 onMouseDown={handleMouseDown}
+                onContextMenu={handleContextMenu}
               >
                 {/* 图片序号 */}
                 <div className="absolute top-3 left-3 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold z-10 pointer-events-none">
@@ -386,6 +422,66 @@ function LightboxPreview({ photos, initialIndex, onClose, allPhotos, onGroupChan
             }}
           >
             {flashMessage.text}
+          </div>
+        </div>
+      )}
+
+      {/* 右键菜单 */}
+      {contextMenu && (
+        <div
+          className="fixed z-[70] bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-gray-700"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="py-2 min-w-[200px]">
+            <button
+              onClick={() => {
+                setCategory(contextMenu.photoId, 'correct');
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
+            >
+              <span className="text-green-500 font-bold text-xl">✓</span>
+              <span className="text-white font-medium">正确</span>
+              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">1</span>
+            </button>
+            <button
+              onClick={() => {
+                setCategory(contextMenu.photoId, 'medium');
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
+            >
+              <span className="text-yellow-500 font-bold text-xl">~</span>
+              <span className="text-white font-medium">中等</span>
+              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">2</span>
+            </button>
+            <button
+              onClick={() => {
+                setCategory(contextMenu.photoId, 'wrong');
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
+            >
+              <span className="text-red-500 font-bold text-xl">✕</span>
+              <span className="text-white font-medium">错误</span>
+              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">3</span>
+            </button>
+            <div className="h-px bg-gray-700 my-1"></div>
+            <button
+              onClick={() => {
+                setCategory(contextMenu.photoId, null);
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
+            >
+              <span className="text-gray-500 font-bold text-xl">○</span>
+              <span className="text-gray-400 font-medium">取消标签</span>
+              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">X</span>
+            </button>
           </div>
         </div>
       )}

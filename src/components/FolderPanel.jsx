@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 
-function FolderPanel({ onFilterChange, onSelectedFoldersChange }) {
+const FolderPanel = memo(function FolderPanel({ onFilterChange, onSelectedFoldersChange }) {
   const photos = usePhotoStore((state) => state.photos);
   const [isOpen, setIsOpen] = useState(true);
   const [selectedFolders, setSelectedFolders] = useState([]);
   const [lastSelected, setLastSelected] = useState(null);
   const [expandedFolders, setExpandedFolders] = useState(new Set());
 
-  // 构建文件夹树
-  const buildFolderTree = () => {
+  // 构建文件夹树 - 使用 useMemo 避免每次渲染都重建
+  const folderTree = useMemo(() => {
     const tree = {};
 
     photos.forEach(photo => {
@@ -42,9 +42,7 @@ function FolderPanel({ onFilterChange, onSelectedFoldersChange }) {
     });
 
     return tree;
-  };
-
-  const folderTree = buildFolderTree();
+  }, [photos]);
 
   // 扁平化文件夹列表(用于 Shift 选择)
   const flattenFolders = (tree, result = []) => {
@@ -246,6 +244,6 @@ function FolderPanel({ onFilterChange, onSelectedFoldersChange }) {
       </div>
     </div>
   );
-}
+});
 
 export default FolderPanel;

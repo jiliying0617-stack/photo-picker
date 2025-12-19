@@ -1,23 +1,15 @@
-import { useMemo } from 'react';
+import { memo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 
-function PhotoItem({ photo, style }) {
+const PhotoItem = memo(function PhotoItem({ photo, style }) {
   const setCategory = usePhotoStore((state) => state.setCategory);
   const selectedPhotoId = usePhotoStore((state) => state.selectedPhotoId);
   const setSelectedPhotoId = usePhotoStore((state) => state.setSelectedPhotoId);
 
   const isSelected = selectedPhotoId === photo.id;
 
-  // 延迟创建缩略图 URL (只在渲染时创建,节省内存)
-  const thumbnailUrl = useMemo(() => {
-    if (photo.thumbnailUrl) {
-      return photo.thumbnailUrl;
-    }
-    if (photo.file) {
-      return URL.createObjectURL(photo.file);
-    }
-    return null;
-  }, [photo.thumbnailUrl, photo.file]);
+  // 使用 App.jsx 统一管理的 thumbnailUrl，避免重复创建 blob URL
+  const thumbnailUrl = photo.thumbnailUrl;
 
   // 分类配置
   const categoryConfig = {
@@ -104,6 +96,6 @@ function PhotoItem({ photo, style }) {
       </div>
     </div>
   );
-}
+});
 
 export default PhotoItem;
