@@ -23,10 +23,36 @@ function App() {
   const [isDragging, setIsDragging] = useState(false); // 是否正在拖放
   const [objectUrls, setObjectUrls] = useState(new Map()); // 管理 Object URLs 生命周期
   const [contextMenu, setContextMenu] = useState(null); // 右键菜单状态 { x, y, photoId }
+  const [currentPreviewGroupIndex, setCurrentPreviewGroupIndex] = useState(0); // 当前预览的组索引
+  const [jumpToGroup, setJumpToGroup] = useState(''); // 跳转到指定组的输入框
 
   // 是否为对比模式 (2-8个文件夹)
   const isCompareMode = selectedFolders.length >= 2 && selectedFolders.length <= 8;
   const compareColumns = isCompareMode ? selectedFolders.length : columns;
+
+  // 计算总组数
+  const totalGroups = isCompareMode
+    ? Math.ceil(displayPhotosWithUrls.length / compareColumns)
+    : 0;
+
+  // 滚动到指定组
+  const scrollToGroup = useCallback((groupIndex) => {
+    if (!isCompareMode || groupIndex < 0 || groupIndex >= totalGroups) return;
+
+    const container = document.getElementById('photo-container');
+    if (!container) return;
+
+    // 计算该组第一张图片的索引
+    const photoIndex = groupIndex * compareColumns;
+    const photoElements = container.querySelectorAll('.photo-item');
+
+    if (photoElements[photoIndex]) {
+      photoElements[photoIndex].scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  }, [isCompareMode, totalGroups, compareColumns]);
 
   // 过滤后的图片列表 - 简化：直接在这里过滤，不存函数
   const filteredPhotos = useMemo(() => {
@@ -460,6 +486,12 @@ function App() {
 
                 const handlePlaceholderDoubleClick = () => {
                   // 双击打开预览整组（包括占位符）
+                  // 保存当前组索引（对比模式下）
+                  if (isCompareMode) {
+                    const groupIndex = Math.floor(idx / compareColumns);
+                    setCurrentPreviewGroupIndex(groupIndex);
+                  }
+
                   if (selectedPhotos.length > 0) {
                     // 如果有框选的图片，预览所有框选的
                     const photosToPreview = displayPhotosWithUrls.filter((p, i) =>
@@ -477,7 +509,7 @@ function App() {
                 return (
                   <div
                     key={placeholderId}
-                    className={`neu-card rounded-2xl overflow-hidden cursor-pointer transition-all ${
+                    className={`photo-item neu-card rounded-2xl overflow-hidden cursor-pointer transition-all ${
                       isPlaceholderSelected ? 'ring-4 ring-blue-500' : ''
                     }`}
                     onClick={handlePlaceholderClick}
@@ -532,6 +564,11 @@ function App() {
                 const photosToPreview = selectedPhotos.length > 0
                   ? displayPhotosWithUrls.filter(p => p && selectedPhotos.includes(p.id))
                   : [photo];
+                // 保存当前组索引（对比模式下）
+                if (isCompareMode) {
+                  const groupIndex = Math.floor(idx / compareColumns);
+                  setCurrentPreviewGroupIndex(groupIndex);
+                }
                 setPreviewPhotos(photosToPreview);
               };
 
@@ -545,7 +582,7 @@ function App() {
               };
 
               return (
-                <div key={photo.id} className={`neu-card rounded-2xl overflow-hidden ${isBoxSelected ? 'ring-4 ring-blue-500' : ''}`}>
+                <div key={photo.id} className={`photo-item neu-card rounded-2xl overflow-hidden ${isBoxSelected ? 'ring-4 ring-blue-500' : ''}`}>
                   {isCompareMode && (
                     <div className="p-2 bg-[#e0e5ec] border-b border-gray-300">
                       <div className="text-xs text-gray-600 truncate font-medium">
@@ -657,6 +694,16 @@ function App() {
                     const photosToPreview = displayPhotosWithUrls.filter((p, i) =>
                       p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
                     );
+                    // 保存第一个选中项的组索引
+                    if (isCompareMode && selectedPhotos.length > 0) {
+                      const firstSelectedIndex = displayPhotosWithUrls.findIndex((p, i) =>
+                        p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
+                      );
+                      if (firstSelectedIndex >= 0) {
+                        const groupIndex = Math.floor(firstSelectedIndex / compareColumns);
+                        setCurrentPreviewGroupIndex(groupIndex);
+                      }
+                    }
                     setPreviewPhotos(photosToPreview);
                   }}
                   className="px-4 py-2 neu-button rounded-lg text-blue-600 text-sm font-medium"
@@ -675,7 +722,13 @@ function App() {
         </div>
       </div>
 
-      <StatusBar />
+      <StatusBar
+        isCompareMode={isCompareMode}
+        totalGroups={totalGroups}
+        jumpToGroup={jumpToGroup}
+        onJumpToGroupChange={setJumpToGroup}
+        onJumpToGroup={scrollToGroup}
+      />
 
       {/* 右键菜单 */}
       {contextMenu && (
@@ -745,6 +798,10 @@ function App() {
           onClose={() => {
             setPreviewPhotos(null);
             setSelectedPhotos([]);
+            // 对比模式下，关闭预览后滚动到之前的组位置
+            if (isCompareMode && currentPreviewGroupIndex >= 0) {
+              setTimeout(() => scrollToGroup(currentPreviewGroupIndex), 100);
+            }
           }}
           allPhotos={displayPhotosWithUrls}
           onGroupChange={(newGroupPhotos) => {

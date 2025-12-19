@@ -1,6 +1,6 @@
 import usePhotoStore from '../store/usePhotoStore';
 
-function StatusBar() {
+function StatusBar({ isCompareMode = false, totalGroups = 0, jumpToGroup = '', onJumpToGroupChange = () => {}, onJumpToGroup = () => {} }) {
   const getStats = usePhotoStore((state) => state.getStats);
   const photos = usePhotoStore((state) => state.photos);
   const stats = getStats();
@@ -17,6 +17,21 @@ function StatusBar() {
   // 检查是否有图片缺少文件对象
   const photosWithoutFile = photos.filter(p => !p.file).length;
   const hasWarning = photosWithoutFile > 0;
+
+  // 处理跳转到组
+  const handleJumpToGroup = () => {
+    const groupNum = parseInt(jumpToGroup, 10);
+    if (!isNaN(groupNum) && groupNum >= 1 && groupNum <= totalGroups) {
+      onJumpToGroup(groupNum - 1); // 转换为0索引
+      onJumpToGroupChange(''); // 清空输入
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleJumpToGroup();
+    }
+  };
 
   return (
     <div className="bg-[#e0e5ec] px-8 py-4">
@@ -52,6 +67,35 @@ function StatusBar() {
               {percentage(stats.wrong, stats.total)}%
             </span>
           </div>
+
+          {/* 对比模式下显示组跳转 */}
+          {isCompareMode && totalGroups > 0 && (
+            <>
+              <div className="h-4 w-px bg-gray-300"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600 font-light">共 {totalGroups} 组</span>
+                <span className="text-gray-400">·</span>
+                <span className="text-gray-500 text-xs">跳转至</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={totalGroups}
+                  value={jumpToGroup}
+                  onChange={(e) => onJumpToGroupChange(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="#"
+                  className="w-14 px-2 py-1 neu-concave rounded text-sm text-center text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <button
+                  onClick={handleJumpToGroup}
+                  disabled={!jumpToGroup || parseInt(jumpToGroup) < 1 || parseInt(jumpToGroup) > totalGroups}
+                  className="neu-button px-2 py-1 rounded text-xs text-blue-600 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
+                >
+                  GO
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* 快捷键提示 - 极速模式 */}
