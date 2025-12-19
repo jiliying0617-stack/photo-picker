@@ -15,6 +15,11 @@ function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
   const photosWithUrls = useMemo(() => {
     const urls = [];
     const result = photos.map(photo => {
+      // 处理占位符 (null)
+      if (!photo) {
+        return null;
+      }
+
       if (photo.thumbnailUrl) {
         return photo;
       }
