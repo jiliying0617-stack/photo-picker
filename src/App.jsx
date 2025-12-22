@@ -96,6 +96,29 @@ function App() {
             rowAlign: 'start',
             behavior: 'smooth',
           });
+
+          // 滚动后，尝试选中该组的第一张真实照片（提升用户体验）
+          setTimeout(() => {
+            const photoIndex = groupIndex * compareColumns;
+            const photo = displayPhotos[photoIndex];
+
+            // 找到该组的第一张真实照片
+            let firstRealPhoto = photo;
+            if (!firstRealPhoto || !firstRealPhoto.id) {
+              // 如果第一个是占位符，找该行的第一张真实照片
+              for (let i = 0; i < compareColumns; i++) {
+                const p = displayPhotos[photoIndex + i];
+                if (p && p.id) {
+                  firstRealPhoto = p;
+                  break;
+                }
+              }
+            }
+
+            if (firstRealPhoto && firstRealPhoto.id) {
+              setSelectedPhotoId(firstRealPhoto.id);
+            }
+          }, 300); // 等待滚动动画完成
         } catch (error) {
           console.warn('滚动到组失败:', error);
           // 回退：尝试使用 refs（仅当照片已渲染时有效）
@@ -110,7 +133,7 @@ function App() {
         }
       }
     },
-    [enableGroupNavigation, totalGroups, compareColumns, displayPhotos, scrollToPhoto, virtualGridRef]
+    [enableGroupNavigation, totalGroups, compareColumns, displayPhotos, scrollToPhoto, virtualGridRef, setSelectedPhotoId]
   );
 
 
