@@ -36,6 +36,7 @@ function App() {
   const [filter, setFilter] = useState({ category: null, folders: [] });
   const [selectedFolders, setSelectedFolders] = useState([]);
   const [jumpToGroup, setJumpToGroup] = useState('');
+  const [virtualGridRef, setVirtualGridRef] = useState(null); // 虚拟网格的引用
 
   // 自定义 Hooks
   const { filteredPhotos } = usePhotoDisplay(photos, filter);
@@ -79,23 +80,36 @@ function App() {
     ? Math.ceil(displayPhotos.length / compareColumns)
     : 0;
 
-  // 滚动到指定组（使用 O(1) refs 查找替代 O(n) querySelectorAll）
+  // 滚动到指定组（使用虚拟网格的 scrollToCell API）
   const scrollToGroup = useCallback(
     (groupIndex) => {
       if (!enableGroupNavigation || groupIndex < 0 || groupIndex >= totalGroups) return;
 
-      const photoIndex = groupIndex * compareColumns;
-      const photo = displayPhotos[photoIndex];
-
-      if (photo && photo.id) {
-        // 尝试使用 refs 滚动（O(1)）
-        scrollToPhoto(photo.id, {
-          behavior: 'smooth',
-          block: 'start',
-        });
+      // 使用虚拟网格的 scrollToCell API 直接滚动到指定行
+      if (virtualGridRef) {
+        const rowIndex = groupIndex;
+        try {
+          virtualGridRef.scrollToCell({
+            rowIndex,
+            columnIndex: 0,
+            rowAlign: 'start',
+            behavior: 'smooth',
+          });
+        } catch (error) {
+          console.warn('滚动到组失败:', error);
+          // 回退：尝试使用 refs（仅当照片已渲染时有效）
+          const photoIndex = groupIndex * compareColumns;
+          const photo = displayPhotos[photoIndex];
+          if (photo && photo.id) {
+            scrollToPhoto(photo.id, {
+              behavior: 'smooth',
+              block: 'start',
+            });
+          }
+        }
       }
     },
-    [enableGroupNavigation, totalGroups, compareColumns, displayPhotos, scrollToPhoto]
+    [enableGroupNavigation, totalGroups, compareColumns, displayPhotos, scrollToPhoto, virtualGridRef]
   );
 
 
@@ -184,6 +198,7 @@ function App() {
             setCurrentPreviewGroupIndex={setCurrentPreviewGroupIndex}
             openContextMenu={openContextMenu}
             setPhotoRef={setPhotoRef}
+            onGridRefReady={setVirtualGridRef}
           />
 
           {/* 框选提示 */}

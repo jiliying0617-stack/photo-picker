@@ -27,6 +27,7 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   openContextMenu,
   setPhotoRef,
   allPhotos, // 所有照片（用于URL管理）
+  onGridRefReady, // 新增：将gridRef暴露给父组件
 }) {
   const containerRef = useRef(null);
   const gridRef = useRef(null);
@@ -340,6 +341,13 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
       endRow: Math.min(rowCount - 1, lastVisibleRow + 2),
     });
   }, [rowHeight, containerSize.height, rowCount]);
+
+  // 暴露gridRef给父组件（用于跳转功能）
+  useEffect(() => {
+    if (gridRef.current && onGridRefReady) {
+      onGridRefReady(gridRef.current);
+    }
+  }, [onGridRefReady]);
 
   // 容器未初始化时显示占位
   if (containerSize.width === 0 || containerSize.height === 0) {
