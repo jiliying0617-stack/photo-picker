@@ -66,17 +66,14 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
     if (firstScreenPhotos.length > 0) {
       // 立即预加载，不等滚动
       preloadUrls(firstScreenPhotos);
-
-      // 使用 queueMicrotask 避免在 effect 中直接 setState
-      queueMicrotask(() => {
-        setIsInitialLoad(false);
-        setVisibleRange({
-          startRow: 0,
-          endRow: preloadRowCount,
-        });
+      setIsInitialLoad(false);
+      setVisibleRange({
+        startRow: 0,
+        endRow: preloadRowCount,
       });
     }
-  }, [photos, columns, containerSize.height, rowHeight, isInitialLoad, preloadUrls]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos, columns, containerSize.height, rowHeight, isInitialLoad]);
 
   // 监听容器尺寸变化
   useEffect(() => {
