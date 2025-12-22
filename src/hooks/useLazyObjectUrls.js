@@ -72,23 +72,24 @@ export function useLazyObjectUrls(allPhotos) {
     };
   }, []);
 
+  // 使用 ref 存储函数，避免 useCallback 依赖链
+  const getFullUrlRef = useRef(null);
+  const getThumbnailUrlRef = useRef(null);
+
   // 获取或创建完整图 URL（用于预览）
-  const getFullUrl = useCallback((photo) => {
+  getFullUrlRef.current = (photo) => {
     if (!photo || !photo.file) return null;
 
     const cache = urlCacheRef.current;
     const cached = cache.get(photo.id);
 
     if (cached && cached.fullUrl) {
-      // 更新最后使用时间
       cached.lastUsed = Date.now();
       return cached.fullUrl;
     }
 
-    // 创建完整图 URL
     const fullUrl = URL.createObjectURL(photo.file);
 
-    // 更新缓存
     if (cached) {
       cached.fullUrl = fullUrl;
       cached.lastUsed = Date.now();
@@ -101,27 +102,24 @@ export function useLazyObjectUrls(allPhotos) {
     }
 
     return fullUrl;
-  }, []);
+  };
 
   // 获取或创建缩略图 URL（用于网格显示）
-  const getThumbnailUrl = useCallback(async (photo) => {
+  getThumbnailUrlRef.current = async (photo) => {
     if (!photo || !photo.file) return null;
 
     const cache = urlCacheRef.current;
     const cached = cache.get(photo.id);
 
     if (cached && cached.thumbnailUrl) {
-      // 更新最后使用时间
       cached.lastUsed = Date.now();
       return cached.thumbnailUrl;
     }
 
     try {
-      // 生成缩略图（300px，质量 0.8）
       const thumbnailBlob = await generateThumbnail(photo.file, 300, 0.8);
       const thumbnailUrl = URL.createObjectURL(thumbnailBlob);
 
-      // 更新缓存
       if (cached) {
         cached.thumbnailUrl = thumbnailUrl;
         cached.lastUsed = Date.now();
@@ -136,10 +134,13 @@ export function useLazyObjectUrls(allPhotos) {
       return thumbnailUrl;
     } catch (error) {
       console.warn('缩略图生成失败，使用原图:', photo.name, error);
-      // 降级：使用原图
-      return getFullUrl(photo);
+      return getFullUrlRef.current(photo);
     }
-  }, [getFullUrl]); // 添加 getFullUrl 到依赖数组
+  };
+
+  // 稳定的包装函数
+  const getFullUrl = useCallback((photo) => getFullUrlRef.current(photo), []);
+  const getThumbnailUrl = useCallback((photo) => getThumbnailUrlRef.current(photo), []);
 
   // 兼容旧代码：默认返回缩略图（同步版本）
   const getPhotoUrl = useCallback((photo) => {
@@ -148,27 +149,23 @@ export function useLazyObjectUrls(allPhotos) {
     const cache = urlCacheRef.current;
     const cached = cache.get(photo.id);
 
-    // 优先返回已缓存的缩略图
     if (cached && cached.thumbnailUrl) {
       cached.lastUsed = Date.now();
       return cached.thumbnailUrl;
     }
 
-    // 如果没有缩略图，返回完整图
     if (cached && cached.fullUrl) {
       cached.lastUsed = Date.now();
       return cached.fullUrl;
     }
 
-    // 都没有，返回完整图（同步）
-    return getFullUrl(photo);
-  }, [getFullUrl]);
+    return getFullUrlRef.current(photo);
+  }, []);
 
   // 批量预加载缩略图（优化：使用 requestIdleCallback 避免阻塞主线程）
   const preloadUrls = useCallback(async (photos) => {
     if (!photos || photos.length === 0) return;
 
-    // 分批处理，每批5个（缩略图生成需要时间）
     const batchSize = 5;
     let currentIndex = 0;
     let createdCount = 0;
@@ -176,14 +173,12 @@ export function useLazyObjectUrls(allPhotos) {
     const processBatch = async () => {
       const batch = photos.slice(currentIndex, currentIndex + batchSize);
 
-      // 并行生成当前批次的缩略图
       await Promise.all(
         batch.map(async (photo) => {
           if (photo && photo.file) {
             const cached = urlCacheRef.current.get(photo.id);
-            // 只为没有缩略图的照片生成
             if (!cached || !cached.thumbnailUrl) {
-              await getThumbnailUrl(photo);
+              await getThumbnailUrlRef.current(photo);
               createdCount++;
             }
           }
@@ -192,23 +187,19 @@ export function useLazyObjectUrls(allPhotos) {
 
       currentIndex += batchSize;
 
-      // 如果还有未处理的照片，继续下一批
       if (currentIndex < photos.length) {
-        // 使用 requestIdleCallback 或 setTimeout 避免阻塞
         if (typeof requestIdleCallback !== 'undefined') {
           requestIdleCallback(processBatch, { timeout: 100 });
         } else {
           setTimeout(processBatch, 0);
         }
       } else if (createdCount > 0) {
-        // 所有批次完成后触发重新渲染
         forceUpdate(prev => prev + 1);
       }
     };
 
-    // 立即开始第一批（确保首屏快速显示）
     processBatch();
-  }, [getThumbnailUrl]); // 添加 getThumbnailUrl 到依赖数组
+  }, []); // 不再需要依赖，使用 ref
 
   return {
     getPhotoUrl,        // 获取单个照片的URL（兼容旧代码，优先返回缩略图）
