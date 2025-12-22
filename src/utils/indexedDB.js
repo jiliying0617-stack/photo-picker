@@ -94,31 +94,21 @@ export async function savePhotosToDB(photos, onProgress) {
   for (let i = 0; i < photos.length; i += CHUNK_SIZE) {
     const chunk = photos.slice(i, i + CHUNK_SIZE);
 
-    // 并行保存这一批图片
+    // 并行保存这一批图片（过滤掉没有 file 的照片）
+    const validPhotos = chunk.filter(photo => photo.file);
+    const skippedInChunk = chunk.length - validPhotos.length;
+    skipped += skippedInChunk;
+
     const results = await Promise.allSettled(
-      chunk.map(async (photo) => {
-        if (!photo.file) {
-          return { status: 'skipped' };
-        }
-        try {
-          await savePhotoToDB(photo);
-          return { status: 'saved' };
-        } catch (error) {
-          console.error(`保存图片失败:`, photo.name, error);
-          return { status: 'failed' };
-        }
-      })
+      validPhotos.map(photo => savePhotoToDB(photo))
     );
 
     // 统计结果
-    results.forEach(result => {
+    results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
-        if (result.value.status === 'saved') {
-          saved++;
-        } else {
-          skipped++;
-        }
+        saved++;
       } else {
+        console.error(`保存图片失败:`, validPhotos[index]?.name, result.reason);
         skipped++;
       }
     });

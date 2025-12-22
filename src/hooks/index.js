@@ -12,3 +12,4 @@ export { useObjectUrls } from './useObjectUrls';
 export { useDragAndDrop } from './useDragAndDrop';
 export { useContextMenu } from './useContextMenu';
 export { usePhotoPreview } from './usePhotoPreview';
+export { usePhotoRefs } from './usePhotoRefs';

@@ -1,8 +1,9 @@
+import { memo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 import FileImporter from './FileImporter';
 import Exporter from './Exporter';
 
-function Toolbar({ toast }) {
+const Toolbar = memo(function Toolbar({ toast }) {
   const columns = usePhotoStore((state) => state.columns);
   const setColumns = usePhotoStore((state) => state.setColumns);
   const clearPhotos = usePhotoStore((state) => state.clearPhotos);
@@ -103,6 +104,6 @@ function Toolbar({ toast }) {
       </div>
     </div>
   );
-}
+});
 
 export default Toolbar;

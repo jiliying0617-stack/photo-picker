@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 import { exportPhotos, isFileSystemAccessSupported } from '../utils/fileSystem';
 
-function Exporter({ toast }) {
+const Exporter = memo(function Exporter({ toast }) {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [showModal, setShowModal] = useState(false);
@@ -326,6 +326,6 @@ function Exporter({ toast }) {
       )}
     </>
   );
-}
+});
 
 export default Exporter;

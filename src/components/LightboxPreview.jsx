@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 
-function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
+const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
   const [scale, setScale] = useState(1); // 图片缩放比例
   const [pan, setPan] = useState({ x: 0, y: 0 }); // 图片平移位置
   const [isPanning, setIsPanning] = useState(false);
@@ -522,6 +522,6 @@ function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
       `}</style>
     </div>
   );
-}
+});
 
 export default LightboxPreview;

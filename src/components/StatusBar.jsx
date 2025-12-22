@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 
-function StatusBar({ isCompareMode = false, enableGroupNavigation = false, totalGroups = 0, jumpToGroup = '', onJumpToGroupChange = () => {}, onJumpToGroup = () => {} }) {
+const StatusBar = memo(function StatusBar({ isCompareMode = false, enableGroupNavigation = false, totalGroups = 0, jumpToGroup = '', onJumpToGroupChange = () => {}, onJumpToGroup = () => {} }) {
   const getStats = usePhotoStore((state) => state.getStats);
   const photos = usePhotoStore((state) => state.photos);
   const stats = getStats();
@@ -145,6 +146,6 @@ function StatusBar({ isCompareMode = false, enableGroupNavigation = false, total
       </div>
     </div>
   );
-}
+});
 
 export default StatusBar;

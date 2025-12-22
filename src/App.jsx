@@ -4,6 +4,9 @@ import Toolbar from './components/Toolbar';
 import StatusBar from './components/StatusBar';
 import FolderPanel from './components/FolderPanel';
 import LightboxPreview from './components/LightboxPreview';
+import DragOverlay from './components/DragOverlay';
+import PhotoContextMenu from './components/PhotoContextMenu';
+import SelectionToolbar from './components/SelectionToolbar';
 import { getFileFormat, getFormatBadgeColor } from './utils/imageUtils';
 import {
   usePhotoDisplay,
@@ -15,6 +18,7 @@ import {
   useContextMenu,
   usePhotoPreview,
   useToast,
+  usePhotoRefs,
 } from './hooks';
 import Toast from './components/Toast';
 
@@ -37,14 +41,15 @@ function App() {
   // 自定义 Hooks
   const { displayCount, setDisplayCount, filteredPhotos } = usePhotoDisplay(photos, filter);
   const { selectedPhotos, setSelectedPhotos, clearSelection } = usePhotoSelection();
+  const { gridRef, setPhotoRef, scrollToPhoto, scrollToIndex } = usePhotoRefs();
   const { isCompareMode, compareColumns, displayPhotos } = useCompareMode(
     selectedFolders,
-    photos,
+    filteredPhotos,
     folderMap,
-    filter,
     displayCount,
     columns,
-    setSelectedPhotoId
+    setSelectedPhotoId,
+    scrollToPhoto
   );
   const displayPhotosWithUrls = useObjectUrls(displayPhotos, photos);
   const { isDragging } = useDragAndDrop();
@@ -75,25 +80,23 @@ function App() {
     ? Math.ceil(displayPhotosWithUrls.length / compareColumns)
     : 0;
 
-  // 滚动到指定组
+  // 滚动到指定组（使用 O(1) refs 查找替代 O(n) querySelectorAll）
   const scrollToGroup = useCallback(
     (groupIndex) => {
       if (!enableGroupNavigation || groupIndex < 0 || groupIndex >= totalGroups) return;
 
-      const container = document.getElementById('photo-container');
-      if (!container) return;
-
       const photoIndex = groupIndex * compareColumns;
-      const photoElements = container.querySelectorAll('.photo-item');
+      const photo = displayPhotosWithUrls[photoIndex];
 
-      if (photoElements[photoIndex]) {
-        photoElements[photoIndex].scrollIntoView({
+      if (photo && photo.id) {
+        // 尝试使用 refs 滚动（O(1)）
+        scrollToPhoto(photo.id, {
           behavior: 'smooth',
           block: 'start',
         });
       }
     },
-    [enableGroupNavigation, totalGroups, compareColumns]
+    [enableGroupNavigation, totalGroups, compareColumns, displayPhotosWithUrls, scrollToPhoto]
   );
 
 
@@ -141,17 +144,7 @@ function App() {
       <Toolbar toast={{ success, error, warning, info }} />
 
       {/* 拖放蒙层 */}
-      {isDragging && (
-        <div className="fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-          <div className="neu-card p-12 rounded-3xl shadow-2xl">
-            <div className="text-center">
-              <div className="text-6xl mb-4">📁</div>
-              <div className="text-2xl font-bold text-gray-800 mb-2">松开鼠标导入文件夹</div>
-              <div className="text-sm text-gray-500">支持拖入包含图片的文件夹</div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DragOverlay isDragging={isDragging} />
 
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧文件夹面板 */}
@@ -292,7 +285,12 @@ function App() {
               };
 
               return (
-                <div key={photo.id} className={`photo-item neu-card rounded-2xl overflow-hidden ${isBoxSelected ? 'ring-4 ring-blue-500' : ''}`}>
+                <div
+                  key={photo.id}
+                  ref={(el) => setPhotoRef(photo.id, el)}
+                  data-photo-id={photo.id}
+                  className={`photo-item neu-card rounded-2xl overflow-hidden ${isBoxSelected ? 'ring-4 ring-blue-500' : ''}`}
+                >
                   {isCompareMode && (
                     <div className="p-2 bg-[#e0e5ec] border-b border-gray-300">
                       <div className="text-xs text-gray-600 truncate font-medium">
@@ -392,43 +390,25 @@ function App() {
           )}
 
           {/* 框选提示 */}
-          {selectedPhotos.length > 0 && (
-            <div className="fixed bottom-24 left-1/2 -translate-x-1/2 neu-card p-4 rounded-xl shadow-2xl z-40">
-              <div className="flex items-center gap-4">
-                <div className="text-sm font-medium text-gray-700">
-                  已选择 {selectedPhotos.length} 张图片
-                </div>
-                <button
-                  onClick={() => {
-                    // 包含真实图片和占位符
-                    const photosToPreview = displayPhotosWithUrls.filter((p, i) =>
-                      p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
-                    );
-                    // 保存第一个选中项的组索引
-                    if (isCompareMode && selectedPhotos.length > 0) {
-                      const firstSelectedIndex = displayPhotosWithUrls.findIndex((p, i) =>
-                        p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
-                      );
-                      if (firstSelectedIndex >= 0) {
-                        const groupIndex = Math.floor(firstSelectedIndex / compareColumns);
-                        setCurrentPreviewGroupIndex(groupIndex);
-                      }
-                    }
-                    openPreview(photosToPreview);
-                  }}
-                  className="px-4 py-2 neu-button rounded-lg text-blue-600 text-sm font-medium"
-                >
-                  大图对比
-                </button>
-                <button
-                  onClick={() => setSelectedPhotos([])}
-                  className="px-4 py-2 neu-button rounded-lg text-red-600 text-sm font-medium"
-                >
-                  清除选择
-                </button>
-              </div>
-            </div>
-          )}
+          <SelectionToolbar
+            selectedPhotos={selectedPhotos}
+            onPreview={() => {
+              const photosToPreview = displayPhotosWithUrls.filter((p, i) =>
+                p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
+              );
+              if (isCompareMode && selectedPhotos.length > 0) {
+                const firstSelectedIndex = displayPhotosWithUrls.findIndex((p, i) =>
+                  p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
+                );
+                if (firstSelectedIndex >= 0) {
+                  const groupIndex = Math.floor(firstSelectedIndex / compareColumns);
+                  setCurrentPreviewGroupIndex(groupIndex);
+                }
+              }
+              openPreview(photosToPreview);
+            }}
+            onClear={() => setSelectedPhotos([])}
+          />
         </div>
       </div>
 
@@ -442,64 +422,11 @@ function App() {
       />
 
       {/* 右键菜单 */}
-      {contextMenu && (
-        <div
-          className="fixed z-50 neu-card rounded-xl overflow-hidden shadow-2xl"
-          style={{
-            left: `${contextMenu.x}px`,
-            top: `${contextMenu.y}px`,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="py-2 min-w-[180px]">
-            <button
-              onClick={() => {
-                setCategory(contextMenu.photoId, 'correct');
-                closeContextMenu();
-              }}
-              className="w-full px-4 py-2 text-left hover:bg-green-50 transition-colors flex items-center gap-3"
-            >
-              <span className="text-green-600 font-bold text-lg">✓</span>
-              <span className="text-gray-700">正确</span>
-              <span className="ml-auto text-xs text-gray-400">1</span>
-            </button>
-            <button
-              onClick={() => {
-                setCategory(contextMenu.photoId, 'medium');
-                closeContextMenu();
-              }}
-              className="w-full px-4 py-2 text-left hover:bg-yellow-50 transition-colors flex items-center gap-3"
-            >
-              <span className="text-yellow-600 font-bold text-lg">~</span>
-              <span className="text-gray-700">中等</span>
-              <span className="ml-auto text-xs text-gray-400">2</span>
-            </button>
-            <button
-              onClick={() => {
-                setCategory(contextMenu.photoId, 'wrong');
-                closeContextMenu();
-              }}
-              className="w-full px-4 py-2 text-left hover:bg-red-50 transition-colors flex items-center gap-3"
-            >
-              <span className="text-red-600 font-bold text-lg">✕</span>
-              <span className="text-gray-700">错误</span>
-              <span className="ml-auto text-xs text-gray-400">3</span>
-            </button>
-            <div className="border-t border-gray-200 my-1"></div>
-            <button
-              onClick={() => {
-                setCategory(contextMenu.photoId, null);
-                closeContextMenu();
-              }}
-              className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
-            >
-              <span className="text-gray-400 font-bold text-lg">○</span>
-              <span className="text-gray-500">取消标签</span>
-              <span className="ml-auto text-xs text-gray-400">X</span>
-            </button>
-          </div>
-        </div>
-      )}
+      <PhotoContextMenu
+        contextMenu={contextMenu}
+        setCategory={setCategory}
+        onClose={closeContextMenu}
+      />
 
       {/* 大图预览 */}
       {previewPhotos && (
@@ -513,25 +440,17 @@ function App() {
             closePreview();
             clearSelection();
 
-            // 关闭预览后滚动到该照片位置
+            // 关闭预览后滚动到该照片位置（使用 O(1) refs 替代 O(n) querySelectorAll）
             if (firstRealPhoto) {
               setTimeout(() => {
-                const container = document.getElementById('photo-container');
-                if (!container) return;
+                const success = scrollToPhoto(firstRealPhoto.id, {
+                  behavior: 'smooth',
+                  block: 'center',
+                });
 
-                // 找到该照片在主面板中的索引
-                const photoIndex = displayPhotosWithUrls.findIndex(p => p && p.id === firstRealPhoto.id);
-
-                if (photoIndex >= 0) {
-                  const photoElements = container.querySelectorAll('.photo-item');
-                  if (photoElements[photoIndex]) {
-                    photoElements[photoIndex].scrollIntoView({
-                      behavior: 'smooth',
-                      block: 'center',
-                    });
-                    // 选中该照片
-                    setSelectedPhotoId(firstRealPhoto.id);
-                  }
+                // 选中该照片
+                if (success) {
+                  setSelectedPhotoId(firstRealPhoto.id);
                 }
               }, 100);
             } else if (isCompareMode && currentPreviewGroupIndex >= 0) {

@@ -66,11 +66,12 @@ const usePhotoStore = create((set, get) => ({
 
   // Actions
   setPhotos: (photos) => {
-    // 恢复之前的分类标记
+    // 恢复之前的分类标记并预计算文件夹路径（性能优化）
     const categories = get().categories;
     const photosWithCategories = photos.map(photo => ({
       ...photo,
-      category: categories[photo.path] || photo.category || null
+      category: categories[photo.path] || photo.category || null,
+      folder: getFolderPath(photo.path), // 预计算文件夹路径，避免重复 split/join
     }));
 
     // 构建文件夹映射
@@ -84,7 +85,8 @@ const usePhotoStore = create((set, get) => ({
     const categories = get().categories;
     const photosWithCategories = newPhotos.map(photo => ({
       ...photo,
-      category: categories[photo.path] || photo.category || null
+      category: categories[photo.path] || photo.category || null,
+      folder: getFolderPath(photo.path), // 预计算文件夹路径
     }));
     const updatedPhotos = [...get().photos, ...photosWithCategories];
 
