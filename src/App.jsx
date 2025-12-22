@@ -8,6 +8,7 @@ import DragOverlay from './components/DragOverlay';
 import PhotoContextMenu from './components/PhotoContextMenu';
 import SelectionToolbar from './components/SelectionToolbar';
 import { getFileFormat, getFormatBadgeColor } from './utils/imageUtils';
+import { PHOTO_DISPLAY } from './constants';
 import {
   usePhotoDisplay,
   usePhotoSelection,
@@ -383,9 +384,27 @@ function App() {
             })}
           </div>
 
+          {/* 加载提示和性能警告 */}
           {displayCount < filteredPhotos.length && (
-            <div className="text-center py-8 text-gray-400 text-sm">
-              显示 {displayCount} / {filteredPhotos.length} 张 · 继续滚动加载更多...
+            <div className="text-center py-8">
+              {displayCount >= PHOTO_DISPLAY.MAX_RENDER_COUNT ? (
+                <div className="neu-card p-6 rounded-xl max-w-2xl mx-auto">
+                  <div className="text-yellow-600 text-2xl mb-3">⚠️</div>
+                  <div className="text-gray-800 font-medium mb-2">
+                    已达到最大显示数量 ({PHOTO_DISPLAY.MAX_RENDER_COUNT} 张)
+                  </div>
+                  <div className="text-gray-600 text-sm mb-3">
+                    总共 {filteredPhotos.length} 张照片，还有 {filteredPhotos.length - displayCount} 张未显示
+                  </div>
+                  <div className="text-gray-500 text-xs">
+                    💡 建议：使用左侧文件夹筛选或分类筛选来缩小范围
+                  </div>
+                </div>
+              ) : (
+                <div className="text-gray-400 text-sm">
+                  显示 {displayCount} / {filteredPhotos.length} 张 · 继续滚动加载更多...
+                </div>
+              )}
             </div>
           )}
 

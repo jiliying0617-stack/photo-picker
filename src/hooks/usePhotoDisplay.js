@@ -20,16 +20,32 @@ export function usePhotoDisplay(photos, filter) {
     });
   }, [photos, filter]);
 
-  // 滚动加载更多
+  // 滚动加载更多（添加最大渲染限制防止崩溃）
   useEffect(() => {
     const handleScroll = (e) => {
       const target = e.target;
       const { scrollHeight, scrollTop, clientHeight } = target;
 
       if (scrollHeight - scrollTop <= clientHeight + PHOTO_DISPLAY.SCROLL_THRESHOLD) {
-        setDisplayCount((prev) =>
-          Math.min(prev + PHOTO_DISPLAY.LOAD_INCREMENT, filteredPhotos.length)
-        );
+        setDisplayCount((prev) => {
+          const nextCount = prev + PHOTO_DISPLAY.LOAD_INCREMENT;
+          // 限制最大渲染数量，防止内存溢出和浏览器崩溃
+          const maxCount = Math.min(
+            PHOTO_DISPLAY.MAX_RENDER_COUNT,
+            filteredPhotos.length
+          );
+
+          if (nextCount >= maxCount && prev < maxCount) {
+            // 达到渲染上限时，在控制台警告
+            console.warn(
+              `[性能警告] 已达到最大渲染数量 ${maxCount}。` +
+              `总共有 ${filteredPhotos.length} 张照片，` +
+              `请使用筛选功能缩小范围或分批处理。`
+            );
+          }
+
+          return Math.min(nextCount, maxCount);
+        });
       }
     };
 
