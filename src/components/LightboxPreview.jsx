@@ -8,6 +8,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [flashMessage, setFlashMessage] = useState(null); // 标签切换提示
   const [contextMenu, setContextMenu] = useState(null); // 右键菜单 { x, y, photoId }
+  const [isOverlayMode, setIsOverlayMode] = useState(false); // 叠图对比模式
   const setCategory = usePhotoStore((state) => state.setCategory);
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
 
@@ -154,12 +155,21 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         e.preventDefault();
         setScale(1);
         setPan({ x: 0, y: 0 });
+      } else if (e.key === 'q' || e.key === 'Q') {
+        e.preventDefault();
+        setIsOverlayMode(prev => !prev);
+        // 显示提示
+        setFlashMessage({
+          text: isOverlayMode ? '已退出叠图对比' : '🔀 叠图对比模式（从右到左）',
+          color: isOverlayMode ? 'bg-gray-600' : 'bg-purple-600'
+        });
+        setTimeout(() => setFlashMessage(null), 1500);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu]);
+  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, isOverlayMode]);
 
   // 鼠标滚轮缩放
   useEffect(() => {
@@ -259,9 +269,14 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
             </span>
           )}
           <span className="text-blue-400">缩放: {(scale * 100).toFixed(0)}%</span>
+          {isOverlayMode && (
+            <span className="text-purple-400 font-bold animate-pulse">
+              🔀 叠图对比模式
+            </span>
+          )}
           <span className="text-gray-400 text-xs">
             {allPhotos && totalGroups > 1 ? '↑↓切换组 · ' : ''}
-            滚轮缩放 · 拖拽平移 · R键重置
+            Q叠图对比 · 滚轮缩放 · 拖拽平移 · R键重置
           </span>
         </div>
 
@@ -336,9 +351,13 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       {/* 主预览区 - 固定框架,图片在框内缩放 */}
       <div className="flex-1 overflow-hidden p-1">
         <div
-          className="h-full grid gap-1"
-          style={{
+          className="h-full"
+          style={isOverlayMode ? {
+            position: 'relative',
+          } : {
+            display: 'grid',
             gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
+            gap: '4px',
           }}
         >
           {photosWithUrls.photos.map((photo, idx) => {
@@ -375,11 +394,27 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
               });
             };
 
+            // 计算叠图模式下的z-index（从右到左，最右边的在最上层）
+            const totalRealPhotos = photosWithUrls.photos.filter(p => p).length;
+            const zIndex = isOverlayMode ? (totalRealPhotos - idx) : 1;
+            const opacity = isOverlayMode ? (0.3 + (idx / totalRealPhotos) * 0.7) : 1;
+
             return (
               <div
                 key={photo.id}
                 className="relative bg-black overflow-hidden"
-                style={{ cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
+                style={isOverlayMode ? {
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  zIndex,
+                  opacity,
+                  cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
+                } : {
+                  cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
+                }}
                 onMouseDown={handleMouseDown}
                 onContextMenu={handleContextMenu}
               >
@@ -429,6 +464,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       {/* 底部提示栏 - 固定高度 */}
       <div className="h-10 bg-black/80 flex items-center justify-center gap-8 px-6 text-xs text-gray-400 flex-shrink-0">
         <span>← → 切换</span>
+        <span className="text-purple-400">Q 叠图对比</span>
         <span>滚轮 缩放</span>
         <span>拖拽 平移</span>
         <span>R 重置</span>
