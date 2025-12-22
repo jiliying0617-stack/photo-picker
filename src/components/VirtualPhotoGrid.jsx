@@ -38,6 +38,7 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
 
   // 追踪可见区域并预加载URL
   const [visibleRange, setVisibleRange] = useState({ startRow: 0, endRow: 0 });
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // 当可见区域变化时，预加载URL
   useEffect(() => {
@@ -51,6 +52,33 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
       preloadUrls(visiblePhotos);
     }
   }, [visibleRange, photos, columns, preloadUrls]);
+
+  // 首屏极速加载：立即预加载前3屏的照片
+  useEffect(() => {
+    if (!isInitialLoad || !containerSize.height || !rowHeight) return;
+
+    const visibleRowCount = Math.ceil(containerSize.height / rowHeight);
+    const preloadRowCount = Math.min(visibleRowCount * 3, 10); // 最多预加载10行
+    const endIndex = Math.min(preloadRowCount * columns, photos.length);
+
+    const firstScreenPhotos = photos.slice(0, endIndex).filter(p => p && p.file);
+    if (firstScreenPhotos.length > 0) {
+      // 立即预加载，不等滚动
+      preloadUrls(firstScreenPhotos);
+      setIsInitialLoad(false);
+
+      // 同时设置初始可见范围
+      setVisibleRange({
+        startRow: 0,
+        endRow: preloadRowCount,
+      });
+    }
+  }, [photos, columns, containerSize.height, rowHeight, isInitialLoad, preloadUrls]);
+
+  // photos变化时重置初始加载状态
+  useEffect(() => {
+    setIsInitialLoad(true);
+  }, [photos]);
 
   // 监听容器尺寸变化
   useEffect(() => {

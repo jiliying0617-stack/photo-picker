@@ -84,20 +84,43 @@ export function useLazyObjectUrls(allPhotos) {
     return url;
   }, []);
 
-  // 批量预加载照片URL（用于可见区域+缓冲区）
+  // 批量预加载照片URL（优化：使用 requestIdleCallback 避免阻塞主线程）
   const preloadUrls = useCallback((photos) => {
-    let created = 0;
-    photos.forEach(photo => {
-      if (photo && photo.file && !urlCacheRef.current.has(photo.id)) {
-        getPhotoUrl(photo);
-        created++;
-      }
-    });
+    if (!photos || photos.length === 0) return;
 
-    if (created > 0) {
-      // 触发重新渲染（如果需要）
-      forceUpdate(prev => prev + 1);
-    }
+    // 分批处理，每批10个，避免一次性创建太多URL阻塞UI
+    const batchSize = 10;
+    let currentIndex = 0;
+
+    const processBatch = () => {
+      const batch = photos.slice(currentIndex, currentIndex + batchSize);
+      let created = 0;
+
+      batch.forEach(photo => {
+        if (photo && photo.file && !urlCacheRef.current.has(photo.id)) {
+          getPhotoUrl(photo);
+          created++;
+        }
+      });
+
+      currentIndex += batchSize;
+
+      // 如果还有未处理的照片，继续下一批
+      if (currentIndex < photos.length) {
+        // 使用 requestIdleCallback 或 setTimeout 避免阻塞
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(processBatch, { timeout: 100 });
+        } else {
+          setTimeout(processBatch, 0);
+        }
+      } else if (created > 0) {
+        // 所有批次完成后才触发重新渲染
+        forceUpdate(prev => prev + 1);
+      }
+    };
+
+    // 立即开始第一批（确保首屏快速显示）
+    processBatch();
   }, [getPhotoUrl]);
 
   return {
