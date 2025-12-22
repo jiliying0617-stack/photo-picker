@@ -5,7 +5,7 @@ import { COMPARE_MODE, COMPARE_TRANSITION } from '../constants';
  * 对比模式逻辑 Hook
  * 处理多文件夹对比、图片对齐、模式切换等
  */
-export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displayCount, columns, setSelectedPhotoId, scrollToPhoto, currentPhotoId) {
+export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displayCount, columns, setSelectedPhotoId, scrollToPhoto, currentPhotoId, virtualGridRef) {
   const [lastCompareModePhotoId, setLastCompareModePhotoId] = useState(null);
   const prevIsCompareModeRef = useRef(false);
 
@@ -116,46 +116,74 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
 
       console.log('🔄 对比模式退出，准备定位到照片:', targetPhotoId);
 
-      if (targetPhotoId && scrollToPhoto) {
+      if (targetPhotoId) {
         // 增加延迟确保虚拟滚动完成重新渲染
         setTimeout(() => {
           console.log('📍 开始滚动到目标照片:', targetPhotoId);
 
-          // 使用 'start' 对齐，确保照片在视野顶部（更容易看到）
-          const success = scrollToPhoto(targetPhotoId, {
-            behavior: 'smooth',
-            block: 'start',
-          });
+          // 查找目标照片在filteredPhotos中的索引
+          const photoIndex = filteredPhotos.findIndex(p => p && p.id === targetPhotoId);
 
-          if (success) {
-            console.log('✅ 滚动成功，选中照片');
-            // 选中跳转后的图片
-            if (setSelectedPhotoId) {
-              setSelectedPhotoId(targetPhotoId);
+          if (photoIndex >= 0) {
+            console.log('✅ 找到照片索引:', photoIndex, '总数:', filteredPhotos.length);
+
+            // 优先使用虚拟网格的scrollToCell API（可靠性更高）
+            if (virtualGridRef && virtualGridRef.scrollToCell) {
+              const rowIndex = Math.floor(photoIndex / columns);
+              const columnIndex = photoIndex % columns;
+
+              console.log('🎯 使用虚拟网格滚动，行:', rowIndex, '列:', columnIndex);
+
+              try {
+                virtualGridRef.scrollToCell({
+                  rowIndex,
+                  columnIndex,
+                  rowAlign: 'start',
+                  behavior: 'smooth',
+                });
+
+                // 选中跳转后的图片
+                setTimeout(() => {
+                  if (setSelectedPhotoId) {
+                    setSelectedPhotoId(targetPhotoId);
+                  }
+                  console.log('✅ 滚动并选中完成');
+                }, 100);
+              } catch (error) {
+                console.error('❌ 虚拟网格滚动失败:', error);
+              }
+            } else {
+              // 备用方案：使用scrollToPhoto（但在虚拟滚动中可能失败）
+              console.log('⚠️ 虚拟网格引用不可用，尝试DOM滚动');
+              if (scrollToPhoto) {
+                scrollToPhoto(targetPhotoId, {
+                  behavior: 'smooth',
+                  block: 'start',
+                });
+                if (setSelectedPhotoId) {
+                  setSelectedPhotoId(targetPhotoId);
+                }
+              }
             }
           } else {
-            console.warn('⚠️ 滚动失败，照片可能未渲染');
-            // 备用方案：使用虚拟滚动的 scrollToCell
-            const photoIndex = filteredPhotos.findIndex(p => p && p.id === targetPhotoId);
-            if (photoIndex >= 0) {
-              console.log('🔄 使用备用方案，照片索引:', photoIndex);
-              // 可以在这里触发虚拟滚动的 scrollToCell（如果有 gridRef）
-            }
+            console.warn('⚠️ 未找到目标照片，可能已被过滤');
           }
         }, COMPARE_TRANSITION.SCROLL_DELAY);
-      } else if (displayPhotos.length > 0) {
-        // 如果没有目标照片，跳转到第一张真实照片
-        const firstRealPhoto = displayPhotos.find(p => p && p.id);
-        console.log('⚠️ 没有目标照片，跳转到第一张:', firstRealPhoto?.id);
+      } else if (filteredPhotos.length > 0) {
+        // 如果没有目标照片，跳转到第一张照片
+        const firstPhoto = filteredPhotos[0];
+        console.log('⚠️ 没有目标照片，跳转到第一张:', firstPhoto?.id);
 
-        if (firstRealPhoto && scrollToPhoto) {
+        if (firstPhoto && virtualGridRef && virtualGridRef.scrollToCell) {
           setTimeout(() => {
-            scrollToPhoto(firstRealPhoto.id, {
+            virtualGridRef.scrollToCell({
+              rowIndex: 0,
+              columnIndex: 0,
+              rowAlign: 'start',
               behavior: 'smooth',
-              block: 'start',
             });
-            if (setSelectedPhotoId) {
-              setSelectedPhotoId(firstRealPhoto.id);
+            if (setSelectedPhotoId && firstPhoto.id) {
+              setSelectedPhotoId(firstPhoto.id);
             }
           }, COMPARE_TRANSITION.SCROLL_DELAY);
         }
@@ -163,7 +191,7 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
     }
 
     prevIsCompareModeRef.current = isCompareMode;
-  }, [isCompareMode, lastCompareModePhotoId, currentPhotoId, displayPhotos, filteredPhotos, setSelectedPhotoId, scrollToPhoto]);
+  }, [isCompareMode, lastCompareModePhotoId, currentPhotoId, filteredPhotos, columns, setSelectedPhotoId, scrollToPhoto, virtualGridRef]);
 
   return {
     isCompareMode,

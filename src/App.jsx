@@ -50,7 +50,8 @@ function App() {
     columns,
     setSelectedPhotoId,
     scrollToPhoto,
-    selectedPhotoId // 传递当前选中的照片ID，用于退出对比模式时跳转
+    selectedPhotoId, // 传递当前选中的照片ID，用于退出对比模式时跳转
+    virtualGridRef // 传递虚拟网格引用，用于滚动定位
   );
   // 不再使用 useObjectUrls - VirtualPhotoGrid 内部按需创建URL
   const { isDragging } = useDragAndDrop();
