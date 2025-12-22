@@ -5,7 +5,7 @@ import { COMPARE_MODE, COMPARE_TRANSITION } from '../constants';
  * 对比模式逻辑 Hook
  * 处理多文件夹对比、图片对齐、模式切换等
  */
-export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displayCount, columns, setSelectedPhotoId, scrollToPhoto) {
+export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displayCount, columns, setSelectedPhotoId, scrollToPhoto, currentPhotoId) {
   const [lastCompareModePhotoId, setLastCompareModePhotoId] = useState(null);
   const prevIsCompareModeRef = useRef(false);
 
@@ -100,29 +100,51 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
     return alignedPhotos.slice(0, displayCount * compareColumns);
   }, [isCompareMode, filteredPhotos, alignedPhotos, displayCount, compareColumns]);
 
-  // 虚拟滚动模式下不需要 Intersection Observer（已移除，提升性能）
-  // VirtualPhotoGrid 自己管理可见区域
+  // 对比模式下追踪当前照片（使用selectedPhotoId）
+  useEffect(() => {
+    if (isCompareMode && currentPhotoId) {
+      setLastCompareModePhotoId(currentPhotoId);
+    }
+  }, [isCompareMode, currentPhotoId]);
 
   // 监听对比模式切换，实现自动定位
   useEffect(() => {
     // 从对比模式切换到普通模式
-    if (prevIsCompareModeRef.current && !isCompareMode && lastCompareModePhotoId && scrollToPhoto) {
-      setTimeout(() => {
-        // 使用 O(1) 的 refs 查找替代 O(n) 的 querySelectorAll
-        const success = scrollToPhoto(lastCompareModePhotoId, {
-          behavior: 'smooth',
-          block: 'center',
-        });
+    if (prevIsCompareModeRef.current && !isCompareMode) {
+      const targetPhotoId = lastCompareModePhotoId || currentPhotoId;
 
-        // 选中跳转后的图片
-        if (success && setSelectedPhotoId) {
-          setSelectedPhotoId(lastCompareModePhotoId);
+      if (targetPhotoId && scrollToPhoto) {
+        setTimeout(() => {
+          // 优先尝试使用 refs 滚动
+          const success = scrollToPhoto(targetPhotoId, {
+            behavior: 'smooth',
+            block: 'center',
+          });
+
+          // 选中跳转后的图片
+          if (success && setSelectedPhotoId) {
+            setSelectedPhotoId(targetPhotoId);
+          }
+        }, COMPARE_TRANSITION.SCROLL_DELAY);
+      } else if (displayPhotos.length > 0) {
+        // 如果没有目标照片，跳转到第一张真实照片
+        const firstRealPhoto = displayPhotos.find(p => p && p.id);
+        if (firstRealPhoto && scrollToPhoto) {
+          setTimeout(() => {
+            scrollToPhoto(firstRealPhoto.id, {
+              behavior: 'smooth',
+              block: 'center',
+            });
+            if (setSelectedPhotoId) {
+              setSelectedPhotoId(firstRealPhoto.id);
+            }
+          }, COMPARE_TRANSITION.SCROLL_DELAY);
         }
-      }, COMPARE_TRANSITION.SCROLL_DELAY);
+      }
     }
 
     prevIsCompareModeRef.current = isCompareMode;
-  }, [isCompareMode, lastCompareModePhotoId, setSelectedPhotoId, scrollToPhoto]);
+  }, [isCompareMode, lastCompareModePhotoId, currentPhotoId, displayPhotos, setSelectedPhotoId, scrollToPhoto]);
 
   return {
     isCompareMode,

@@ -49,7 +49,8 @@ function App() {
     filteredPhotos.length, // 不再限制显示数量
     columns,
     setSelectedPhotoId,
-    scrollToPhoto
+    scrollToPhoto,
+    selectedPhotoId // 传递当前选中的照片ID，用于退出对比模式时跳转
   );
   // 不再使用 useObjectUrls - VirtualPhotoGrid 内部按需创建URL
   const { isDragging } = useDragAndDrop();
