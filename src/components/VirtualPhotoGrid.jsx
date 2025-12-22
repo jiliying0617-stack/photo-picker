@@ -337,18 +337,11 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
     getPhotoUrl,
   ]);
 
-  // 滚动回调：追踪可见区域
+  // 滚动回调（保留用于未来扩展，当前未使用）
   const handleScroll = useCallback(({ scrollTop }) => {
-    const firstVisibleRow = Math.floor(scrollTop / rowHeight);
-    const visibleRowCount = Math.ceil(containerSize.height / rowHeight);
-    const lastVisibleRow = firstVisibleRow + visibleRowCount;
-
-    // 添加缓冲区（预加载上下各2行）
-    setVisibleRange({
-      startRow: Math.max(0, firstVisibleRow - 2),
-      endRow: Math.min(rowCount - 1, lastVisibleRow + 2),
-    });
-  }, [rowHeight, containerSize.height, rowCount]);
+    // 可以在这里添加滚动追踪逻辑
+    // 例如：追踪可见区域、预加载等
+  }, []);
 
   // 暴露gridRef给父组件（用于跳转功能）
   useEffect(() => {

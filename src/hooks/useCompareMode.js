@@ -114,27 +114,45 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
     if (prevIsCompareModeRef.current && !isCompareMode) {
       const targetPhotoId = lastCompareModePhotoId || currentPhotoId;
 
+      console.log('🔄 对比模式退出，准备定位到照片:', targetPhotoId);
+
       if (targetPhotoId && scrollToPhoto) {
+        // 增加延迟确保虚拟滚动完成重新渲染
         setTimeout(() => {
-          // 优先尝试使用 refs 滚动
+          console.log('📍 开始滚动到目标照片:', targetPhotoId);
+
+          // 使用 'start' 对齐，确保照片在视野顶部（更容易看到）
           const success = scrollToPhoto(targetPhotoId, {
             behavior: 'smooth',
-            block: 'center',
+            block: 'start',
           });
 
-          // 选中跳转后的图片
-          if (success && setSelectedPhotoId) {
-            setSelectedPhotoId(targetPhotoId);
+          if (success) {
+            console.log('✅ 滚动成功，选中照片');
+            // 选中跳转后的图片
+            if (setSelectedPhotoId) {
+              setSelectedPhotoId(targetPhotoId);
+            }
+          } else {
+            console.warn('⚠️ 滚动失败，照片可能未渲染');
+            // 备用方案：使用虚拟滚动的 scrollToCell
+            const photoIndex = filteredPhotos.findIndex(p => p && p.id === targetPhotoId);
+            if (photoIndex >= 0) {
+              console.log('🔄 使用备用方案，照片索引:', photoIndex);
+              // 可以在这里触发虚拟滚动的 scrollToCell（如果有 gridRef）
+            }
           }
         }, COMPARE_TRANSITION.SCROLL_DELAY);
       } else if (displayPhotos.length > 0) {
         // 如果没有目标照片，跳转到第一张真实照片
         const firstRealPhoto = displayPhotos.find(p => p && p.id);
+        console.log('⚠️ 没有目标照片，跳转到第一张:', firstRealPhoto?.id);
+
         if (firstRealPhoto && scrollToPhoto) {
           setTimeout(() => {
             scrollToPhoto(firstRealPhoto.id, {
               behavior: 'smooth',
-              block: 'center',
+              block: 'start',
             });
             if (setSelectedPhotoId) {
               setSelectedPhotoId(firstRealPhoto.id);
@@ -145,7 +163,7 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
     }
 
     prevIsCompareModeRef.current = isCompareMode;
-  }, [isCompareMode, lastCompareModePhotoId, currentPhotoId, displayPhotos, setSelectedPhotoId, scrollToPhoto]);
+  }, [isCompareMode, lastCompareModePhotoId, currentPhotoId, displayPhotos, filteredPhotos, setSelectedPhotoId, scrollToPhoto]);
 
   return {
     isCompareMode,

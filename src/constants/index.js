@@ -63,5 +63,6 @@ export const PREVIEW = {
 
 // 对比模式切换配置
 export const COMPARE_TRANSITION = {
-  SCROLL_DELAY: 100,       // 模式切换后滚动延迟(ms)
+  SCROLL_DELAY: 300,       // 模式切换后滚动延迟(ms) - 增加延迟确保 DOM 更新完成
+  HIGHLIGHT_DURATION: 2000, // 高亮选中照片的时长(ms)
 };

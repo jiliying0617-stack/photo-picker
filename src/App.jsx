@@ -86,6 +86,8 @@ function App() {
     (groupIndex) => {
       if (!enableGroupNavigation || groupIndex < 0 || groupIndex >= totalGroups) return;
 
+      console.log('🎯 跳转到组:', groupIndex, '/', totalGroups);
+
       // 使用虚拟网格的 scrollToCell API 直接滚动到指定行
       if (virtualGridRef) {
         const rowIndex = groupIndex;
