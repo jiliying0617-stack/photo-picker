@@ -72,6 +72,37 @@ export function useLazyObjectUrls(allPhotos) {
     };
   }, []);
 
+  // 获取或创建完整图 URL（用于预览）
+  const getFullUrl = useCallback((photo) => {
+    if (!photo || !photo.file) return null;
+
+    const cache = urlCacheRef.current;
+    const cached = cache.get(photo.id);
+
+    if (cached && cached.fullUrl) {
+      // 更新最后使用时间
+      cached.lastUsed = Date.now();
+      return cached.fullUrl;
+    }
+
+    // 创建完整图 URL
+    const fullUrl = URL.createObjectURL(photo.file);
+
+    // 更新缓存
+    if (cached) {
+      cached.fullUrl = fullUrl;
+      cached.lastUsed = Date.now();
+    } else {
+      cache.set(photo.id, {
+        thumbnailUrl: null,
+        fullUrl,
+        lastUsed: Date.now(),
+      });
+    }
+
+    return fullUrl;
+  }, []);
+
   // 获取或创建缩略图 URL（用于网格显示）
   const getThumbnailUrl = useCallback(async (photo) => {
     if (!photo || !photo.file) return null;
@@ -108,39 +139,7 @@ export function useLazyObjectUrls(allPhotos) {
       // 降级：使用原图
       return getFullUrl(photo);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // getFullUrl 是稳定的（依赖数组为空），不需要添加到依赖中
-
-  // 获取或创建完整图 URL（用于预览）
-  const getFullUrl = useCallback((photo) => {
-    if (!photo || !photo.file) return null;
-
-    const cache = urlCacheRef.current;
-    const cached = cache.get(photo.id);
-
-    if (cached && cached.fullUrl) {
-      // 更新最后使用时间
-      cached.lastUsed = Date.now();
-      return cached.fullUrl;
-    }
-
-    // 创建完整图 URL
-    const fullUrl = URL.createObjectURL(photo.file);
-
-    // 更新缓存
-    if (cached) {
-      cached.fullUrl = fullUrl;
-      cached.lastUsed = Date.now();
-    } else {
-      cache.set(photo.id, {
-        thumbnailUrl: null,
-        fullUrl,
-        lastUsed: Date.now(),
-      });
-    }
-
-    return fullUrl;
-  }, []);
+  }, [getFullUrl]); // 添加 getFullUrl 到依赖数组
 
   // 兼容旧代码：默认返回缩略图（同步版本）
   const getPhotoUrl = useCallback((photo) => {
@@ -209,8 +208,7 @@ export function useLazyObjectUrls(allPhotos) {
 
     // 立即开始第一批（确保首屏快速显示）
     processBatch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // getThumbnailUrl 是稳定的，forceUpdate 也是稳定的，不需要添加到依赖中
+  }, [getThumbnailUrl]); // 添加 getThumbnailUrl 到依赖数组
 
   return {
     getPhotoUrl,        // 获取单个照片的URL（兼容旧代码，优先返回缩略图）
