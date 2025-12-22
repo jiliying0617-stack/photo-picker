@@ -265,6 +265,9 @@ function App() {
         contextMenu={contextMenu}
         setCategory={setCategory}
         onClose={closeContextMenu}
+        isCompareMode={isCompareMode}
+        displayPhotos={displayPhotos}
+        compareColumns={compareColumns}
       />
 
       {/* 大图预览 */}
