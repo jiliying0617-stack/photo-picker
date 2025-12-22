@@ -1,7 +1,8 @@
 import { memo, useRef, useEffect, useState, useCallback } from 'react';
 import { Grid } from 'react-window';
 import { getFileFormat, getFormatBadgeColor } from '../utils/imageUtils';
-import { useLazyObjectUrls } from '../hooks/useLazyObjectUrls';
+// 暂时禁用懒加载，使用简单的 URL 创建
+// import { useLazyObjectUrls } from '../hooks/useLazyObjectUrls';
 
 /**
  * 虚拟化照片网格组件
@@ -34,46 +35,29 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   const gridRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
-  // 懒加载Object URLs（只为可见照片创建URL）
-  const { getPhotoUrl, preloadUrls } = useLazyObjectUrls(allPhotos || photos);
+  // 暂时禁用懒加载，使用简单的 Object URL 管理
+  // const { getPhotoUrl, preloadUrls } = useLazyObjectUrls(allPhotos || photos);
+  const [objectUrls] = useState(() => new Map());
 
-  // 追踪可见区域并预加载URL
-  const [visibleRange, setVisibleRange] = useState({ startRow: 0, endRow: 0 });
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  // 简化的 URL 管理：按需创建
+  const getPhotoUrl = useCallback((photo) => {
+    if (!photo || !photo.file) return null;
 
-  // 当可见区域变化时，预加载URL
-  useEffect(() => {
-    const { startRow, endRow } = visibleRange;
-    const startIndex = startRow * columns;
-    const endIndex = Math.min((endRow + 1) * columns, photos.length);
-
-    // 预加载可见范围的照片URL
-    const visiblePhotos = photos.slice(startIndex, endIndex).filter(p => p && p.file);
-    if (visiblePhotos.length > 0) {
-      preloadUrls(visiblePhotos);
+    if (!objectUrls.has(photo.id)) {
+      const url = URL.createObjectURL(photo.file);
+      objectUrls.set(photo.id, url);
     }
-  }, [visibleRange, photos, columns, preloadUrls]);
 
-  // 首屏极速加载：立即预加载前3屏的照片
+    return objectUrls.get(photo.id);
+  }, [objectUrls]);
+
+  // 清理所有 URLs
   useEffect(() => {
-    if (!isInitialLoad || !containerSize.height || !rowHeight) return;
-
-    const visibleRowCount = Math.ceil(containerSize.height / rowHeight);
-    const preloadRowCount = Math.min(visibleRowCount * 3, 10); // 最多预加载10行
-    const endIndex = Math.min(preloadRowCount * columns, photos.length);
-
-    const firstScreenPhotos = photos.slice(0, endIndex).filter(p => p && p.file);
-    if (firstScreenPhotos.length > 0) {
-      // 立即预加载，不等滚动
-      preloadUrls(firstScreenPhotos);
-      setIsInitialLoad(false);
-      setVisibleRange({
-        startRow: 0,
-        endRow: preloadRowCount,
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photos, columns, containerSize.height, rowHeight, isInitialLoad]);
+    return () => {
+      objectUrls.forEach(url => URL.revokeObjectURL(url));
+      objectUrls.clear();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 监听容器尺寸变化
   useEffect(() => {
