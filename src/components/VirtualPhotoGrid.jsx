@@ -9,6 +9,7 @@ import { useLazyObjectUrls } from '../hooks/useLazyObjectUrls';
  *
  * 性能优势:
  * - 只渲染可见区域的 DOM 节点 (约 20-50 个)
+ * - 使用低分辨率缩略图 (300px) 替代原图，减少 80-90% 内存占用
  * - 只创建可见照片的 Object URLs (内存占用极低)
  * - 滚动时复用 DOM 节点和URLs
  * - 支持 800+ 组文件，10,000+ 张照片流畅运行
@@ -65,20 +66,17 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
     if (firstScreenPhotos.length > 0) {
       // 立即预加载，不等滚动
       preloadUrls(firstScreenPhotos);
-      setIsInitialLoad(false);
 
-      // 同时设置初始可见范围
-      setVisibleRange({
-        startRow: 0,
-        endRow: preloadRowCount,
+      // 使用 queueMicrotask 避免在 effect 中直接 setState
+      queueMicrotask(() => {
+        setIsInitialLoad(false);
+        setVisibleRange({
+          startRow: 0,
+          endRow: preloadRowCount,
+        });
       });
     }
   }, [photos, columns, containerSize.height, rowHeight, isInitialLoad, preloadUrls]);
-
-  // photos变化时重置初始加载状态
-  useEffect(() => {
-    setIsInitialLoad(true);
-  }, [photos]);
 
   // 监听容器尺寸变化
   useEffect(() => {
@@ -127,7 +125,7 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   }, [setSelectedPhotos]);
 
   // 占位符双击处理
-  const handlePlaceholderDoubleClick = useCallback((idx, placeholderId) => {
+  const handlePlaceholderDoubleClick = useCallback((idx) => {
     // 保存当前组索引（对比模式下）
     if (isCompareMode) {
       const groupIndex = Math.floor(idx / columns);
@@ -185,7 +183,7 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   }, [openContextMenu]);
 
   // 单元格渲染器 - 新版 react-window 使用 cellComponent
-  const Cell = useCallback(({ columnIndex, rowIndex, style, ariaAttributes }) => {
+  const Cell = useCallback(({ columnIndex, rowIndex, style }) => {
     const index = rowIndex * columns + columnIndex;
     if (index >= photos.length) return null;
 
@@ -237,7 +235,8 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
     const fileFormat = getFileFormat(photo.name);
     const formatColors = getFormatBadgeColor(fileFormat);
 
-    // 按需获取照片URL（只在渲染时创建）
+    // 按需获取照片URL（优先使用低分辨率缩略图，提升性能）
+    // getPhotoUrl 会优先返回 300px 缩略图，只在没有缩略图时返回完整图
     const thumbnailUrl = photo.thumbnailUrl || getPhotoUrl(photo);
 
     return (

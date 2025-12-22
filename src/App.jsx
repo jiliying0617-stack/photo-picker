@@ -41,7 +41,7 @@ function App() {
   // 自定义 Hooks
   const { filteredPhotos } = usePhotoDisplay(photos, filter);
   const { selectedPhotos, setSelectedPhotos, clearSelection } = usePhotoSelection();
-  const { gridRef, setPhotoRef, scrollToPhoto, scrollToIndex } = usePhotoRefs();
+  const { setPhotoRef, scrollToPhoto } = usePhotoRefs();
   const { isCompareMode, compareColumns, displayPhotos } = useCompareMode(
     selectedFolders,
     filteredPhotos,

@@ -17,7 +17,6 @@ const PhotoGridItem = memo(function PhotoGridItem({
   onPlaceholderClick,
   onPlaceholderDoubleClick,
   setCategory,
-  setSelectedPhotos,
 }) {
   // 处理占位符
   if (!photo) {

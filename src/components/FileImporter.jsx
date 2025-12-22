@@ -83,7 +83,7 @@ const FileImporter = memo(function FileImporter({ toast }) {
 
     window.addEventListener('dropFolder', handleDropFolder);
     return () => window.removeEventListener('dropFolder', handleDropFolder);
-  }, [setPhotos]);
+  }, [setPhotos, toast]);
 
   return (
     <div className="flex items-center gap-4">

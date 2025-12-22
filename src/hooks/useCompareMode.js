@@ -103,7 +103,10 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
   // 对比模式下追踪当前照片（使用selectedPhotoId）
   useEffect(() => {
     if (isCompareMode && currentPhotoId) {
-      setLastCompareModePhotoId(currentPhotoId);
+      // 使用 queueMicrotask 避免在 effect 中直接同步调用 setState
+      queueMicrotask(() => {
+        setLastCompareModePhotoId(currentPhotoId);
+      });
     }
   }, [isCompareMode, currentPhotoId]);
 

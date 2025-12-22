@@ -6,7 +6,9 @@ class ErrorBoundary extends Component {
     this.state = { hasError: false, error: null, errorInfo: null };
   }
 
+  // eslint-disable-next-line no-unused-vars
   static getDerivedStateFromError(error) {
+    // error 参数是 React API 要求的，当前实现中未使用
     return { hasError: true };
   }
 

@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { generateThumbnail } from '../utils/thumbnailGenerator';
 
 /**
- * 懒加载 Object URLs Hook
+ * 懒加载 Object URLs Hook（支持缩略图优化）
  * 只为可见区域的照片创建 Object URLs，极大提升大数据集性能
  *
  * 优化说明：
  * - 按需创建：只为可见+缓冲区照片创建URL
+ * - 双URL策略：缩略图（300px）用于网格，完整图用于预览
  * - 延迟清理：滚动出视野的URL不立即清理（避免频繁创建/销毁）
  * - 智能缓存：保留最近使用的URL（LRU策略）
  * - 支持800+组文件：因为只创建可见的URL，内存占用极低
  */
 export function useLazyObjectUrls(allPhotos) {
-  // URL缓存 Map: photoId -> { url, lastUsed }
+  // URL缓存 Map: photoId -> { thumbnailUrl, fullUrl, lastUsed }
   const urlCacheRef = useRef(new Map());
   const [, forceUpdate] = useState(0);
 
@@ -31,19 +33,21 @@ export function useLazyObjectUrls(allPhotos) {
       // 清理最旧的20%
       const toRemove = Math.floor(cache.size * 0.2);
       for (let i = 0; i < toRemove; i++) {
-        const [id, { url }] = entries[i];
-        URL.revokeObjectURL(url);
+        const [id, { thumbnailUrl, fullUrl }] = entries[i];
+        if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
+        if (fullUrl) URL.revokeObjectURL(fullUrl);
         cache.delete(id);
       }
     }
 
     // 清理过期的URL
-    cache.forEach(({ url, lastUsed }, id) => {
+    cache.forEach(({ thumbnailUrl, fullUrl, lastUsed }, id) => {
       if (now - lastUsed > STALE_TIMEOUT) {
         // 检查这个照片是否还存在于allPhotos中
-        const photoExists = allPhotos.some(p => p.id === id);
+        const photoExists = allPhotos.some(p => p && p.id === id);
         if (!photoExists) {
-          URL.revokeObjectURL(url);
+          if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
+          if (fullUrl) URL.revokeObjectURL(fullUrl);
           cache.delete(id);
         }
       }
@@ -58,50 +62,134 @@ export function useLazyObjectUrls(allPhotos) {
 
   // 组件卸载时清理所有URL
   useEffect(() => {
+    const urlCache = urlCacheRef.current; // 复制 ref 值，避免 cleanup 时引用已改变的值
     return () => {
-      urlCacheRef.current.forEach(({ url }) => URL.revokeObjectURL(url));
-      urlCacheRef.current.clear();
+      urlCache.forEach(({ thumbnailUrl, fullUrl }) => {
+        if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl);
+        if (fullUrl) URL.revokeObjectURL(fullUrl);
+      });
+      urlCache.clear();
     };
   }, []);
 
-  // 获取或创建照片的Object URL
+  // 获取或创建缩略图 URL（用于网格显示）
+  const getThumbnailUrl = useCallback(async (photo) => {
+    if (!photo || !photo.file) return null;
+
+    const cache = urlCacheRef.current;
+    const cached = cache.get(photo.id);
+
+    if (cached && cached.thumbnailUrl) {
+      // 更新最后使用时间
+      cached.lastUsed = Date.now();
+      return cached.thumbnailUrl;
+    }
+
+    try {
+      // 生成缩略图（300px，质量 0.8）
+      const thumbnailBlob = await generateThumbnail(photo.file, 300, 0.8);
+      const thumbnailUrl = URL.createObjectURL(thumbnailBlob);
+
+      // 更新缓存
+      if (cached) {
+        cached.thumbnailUrl = thumbnailUrl;
+        cached.lastUsed = Date.now();
+      } else {
+        cache.set(photo.id, {
+          thumbnailUrl,
+          fullUrl: null,
+          lastUsed: Date.now(),
+        });
+      }
+
+      return thumbnailUrl;
+    } catch (error) {
+      console.warn('缩略图生成失败，使用原图:', photo.name, error);
+      // 降级：使用原图
+      return getFullUrl(photo);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // getFullUrl 是稳定的（依赖数组为空），不需要添加到依赖中
+
+  // 获取或创建完整图 URL（用于预览）
+  const getFullUrl = useCallback((photo) => {
+    if (!photo || !photo.file) return null;
+
+    const cache = urlCacheRef.current;
+    const cached = cache.get(photo.id);
+
+    if (cached && cached.fullUrl) {
+      // 更新最后使用时间
+      cached.lastUsed = Date.now();
+      return cached.fullUrl;
+    }
+
+    // 创建完整图 URL
+    const fullUrl = URL.createObjectURL(photo.file);
+
+    // 更新缓存
+    if (cached) {
+      cached.fullUrl = fullUrl;
+      cached.lastUsed = Date.now();
+    } else {
+      cache.set(photo.id, {
+        thumbnailUrl: null,
+        fullUrl,
+        lastUsed: Date.now(),
+      });
+    }
+
+    return fullUrl;
+  }, []);
+
+  // 兼容旧代码：默认返回缩略图（同步版本）
   const getPhotoUrl = useCallback((photo) => {
     if (!photo || !photo.file) return null;
 
     const cache = urlCacheRef.current;
     const cached = cache.get(photo.id);
 
-    if (cached) {
-      // 更新最后使用时间
+    // 优先返回已缓存的缩略图
+    if (cached && cached.thumbnailUrl) {
       cached.lastUsed = Date.now();
-      return cached.url;
+      return cached.thumbnailUrl;
     }
 
-    // 创建新的URL
-    const url = URL.createObjectURL(photo.file);
-    cache.set(photo.id, { url, lastUsed: Date.now() });
+    // 如果没有缩略图，返回完整图
+    if (cached && cached.fullUrl) {
+      cached.lastUsed = Date.now();
+      return cached.fullUrl;
+    }
 
-    return url;
-  }, []);
+    // 都没有，返回完整图（同步）
+    return getFullUrl(photo);
+  }, [getFullUrl]);
 
-  // 批量预加载照片URL（优化：使用 requestIdleCallback 避免阻塞主线程）
-  const preloadUrls = useCallback((photos) => {
+  // 批量预加载缩略图（优化：使用 requestIdleCallback 避免阻塞主线程）
+  const preloadUrls = useCallback(async (photos) => {
     if (!photos || photos.length === 0) return;
 
-    // 分批处理，每批10个，避免一次性创建太多URL阻塞UI
-    const batchSize = 10;
+    // 分批处理，每批5个（缩略图生成需要时间）
+    const batchSize = 5;
     let currentIndex = 0;
+    let createdCount = 0;
 
-    const processBatch = () => {
+    const processBatch = async () => {
       const batch = photos.slice(currentIndex, currentIndex + batchSize);
-      let created = 0;
 
-      batch.forEach(photo => {
-        if (photo && photo.file && !urlCacheRef.current.has(photo.id)) {
-          getPhotoUrl(photo);
-          created++;
-        }
-      });
+      // 并行生成当前批次的缩略图
+      await Promise.all(
+        batch.map(async (photo) => {
+          if (photo && photo.file) {
+            const cached = urlCacheRef.current.get(photo.id);
+            // 只为没有缩略图的照片生成
+            if (!cached || !cached.thumbnailUrl) {
+              await getThumbnailUrl(photo);
+              createdCount++;
+            }
+          }
+        })
+      );
 
       currentIndex += batchSize;
 
@@ -113,19 +201,22 @@ export function useLazyObjectUrls(allPhotos) {
         } else {
           setTimeout(processBatch, 0);
         }
-      } else if (created > 0) {
-        // 所有批次完成后才触发重新渲染
+      } else if (createdCount > 0) {
+        // 所有批次完成后触发重新渲染
         forceUpdate(prev => prev + 1);
       }
     };
 
     // 立即开始第一批（确保首屏快速显示）
     processBatch();
-  }, [getPhotoUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // getThumbnailUrl 是稳定的，forceUpdate 也是稳定的，不需要添加到依赖中
 
   return {
-    getPhotoUrl,      // 获取单个照片的URL
-    preloadUrls,      // 批量预加载URLs
+    getPhotoUrl,        // 获取单个照片的URL（兼容旧代码，优先返回缩略图）
+    getThumbnailUrl,    // 获取缩略图URL（异步，用于网格）
+    getFullUrl,         // 获取完整图URL（同步，用于预览）
+    preloadUrls,        // 批量预加载缩略图
     cacheSize: urlCacheRef.current.size, // 当前缓存大小（调试用）
   };
 }

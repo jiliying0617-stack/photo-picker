@@ -9,29 +9,32 @@ export function useObjectUrls(displayPhotos, allPhotos) {
 
   // 管理 Object URLs 生命周期
   useEffect(() => {
-    setObjectUrls((prevUrls) => {
-      const newUrls = new Map(prevUrls);
-      const allPhotoIds = new Set(allPhotos.map((p) => p.id));
+    // 使用 queueMicrotask 避免在 effect 中直接同步调用 setState
+    queueMicrotask(() => {
+      setObjectUrls((prevUrls) => {
+        const newUrls = new Map(prevUrls);
+        const allPhotoIds = new Set(allPhotos.map((p) => p.id));
 
-      // 为需要的照片创建 URL
-      displayPhotos.forEach((photo) => {
-        if (photo && photo.file && !newUrls.has(photo.id)) {
-          const url = URL.createObjectURL(photo.file);
-          newUrls.set(photo.id, url);
-        }
+        // 为需要的照片创建 URL
+        displayPhotos.forEach((photo) => {
+          if (photo && photo.file && !newUrls.has(photo.id)) {
+            const url = URL.createObjectURL(photo.file);
+            newUrls.set(photo.id, url);
+          }
+        });
+
+        // 只清理已经从 photos 数组中删除的 URL
+        const idsToRemove = [];
+        newUrls.forEach((url, id) => {
+          if (!allPhotoIds.has(id)) {
+            URL.revokeObjectURL(url);
+            idsToRemove.push(id);
+          }
+        });
+        idsToRemove.forEach((id) => newUrls.delete(id));
+
+        return newUrls;
       });
-
-      // 只清理已经从 photos 数组中删除的 URL
-      const idsToRemove = [];
-      newUrls.forEach((url, id) => {
-        if (!allPhotoIds.has(id)) {
-          URL.revokeObjectURL(url);
-          idsToRemove.push(id);
-        }
-      });
-      idsToRemove.forEach((id) => newUrls.delete(id));
-
-      return newUrls;
     });
   }, [displayPhotos, allPhotos]);
 

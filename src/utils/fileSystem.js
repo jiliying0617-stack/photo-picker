@@ -209,7 +209,9 @@ function sanitizeName(name, keepSpecialChars = true) {
     .replace(/[<>:"|?*]/g, '_')  // 替换为下划线
     .replace(/\//g, '-')          // 斜杠替换为横杠
     .replace(/\\/g, '-')          // 反斜杠替换为横杠
+    // eslint-disable-next-line no-control-regex
     .replace(/\x00/g, '')         // 移除 null 字符
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // 移除控制字符
     .trim();
 
@@ -316,7 +318,8 @@ export async function exportPhotos(photos, selectedCategories, onProgress, optio
         let counter = 1;
         while (true) {
           try {
-            const existingFile = await currentDir.getFileHandle(finalFileName);
+            // 尝试获取文件句柄，如果文件存在则不会抛出异常
+            await currentDir.getFileHandle(finalFileName);
             // 文件存在，添加数字后缀
             const ext = sanitizedFileName.match(/\.[^.]+$/)?.[0] || '';
             const nameWithoutExt = sanitizedFileName.slice(0, -ext.length);
