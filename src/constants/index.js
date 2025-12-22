@@ -5,11 +5,12 @@
 
 // 图片显示配置
 export const PHOTO_DISPLAY = {
-  INITIAL_COUNT: 100,      // 初始显示图片数量
-  LOAD_INCREMENT: 50,      // 每次滚动加载增量
-  SCROLL_THRESHOLD: 500,   // 触发加载的滚动阈值(px)
-  MAX_RENDER_COUNT: 500,   // 最大渲染数量（防止内存溢出和崩溃）
-  SAFE_RENDER_COUNT: 800,  // 安全渲染上限（超过此值会有性能警告）
+  INITIAL_COUNT: 100,      // 初始显示图片数量（已废弃，虚拟滚动不需要）
+  LOAD_INCREMENT: 50,      // 每次滚动加载增量（已废弃）
+  SCROLL_THRESHOLD: 500,   // 触发加载的滚动阈值(px)（已废弃）
+  MAX_RENDER_COUNT: Infinity, // 无限制！虚拟滚动 + 按需URL创建解决了性能问题
+  SAFE_RENDER_COUNT: 800,  // 已废弃
+  VISIBLE_BUFFER: 10,      // 可见区域缓冲行数（预加载）
 };
 
 // 对比模式配置
