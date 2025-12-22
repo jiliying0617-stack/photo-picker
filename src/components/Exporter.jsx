@@ -2,7 +2,7 @@ import { useState } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 import { exportPhotos, isFileSystemAccessSupported } from '../utils/fileSystem';
 
-function Exporter() {
+function Exporter({ toast }) {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [showModal, setShowModal] = useState(false);
@@ -22,12 +22,12 @@ function Exporter() {
 
   const handleOpenModal = () => {
     if (photos.length === 0) {
-      alert('没有图片可导出!');
+      toast.warning('没有图片可导出!');
       return;
     }
 
     if (!isFileSystemAccessSupported()) {
-      alert('您的浏览器不支持文件夹导出功能。\n请使用 Chrome 或 Edge 浏览器。');
+      toast.error('您的浏览器不支持文件夹导出功能。请使用 Chrome 或 Edge 浏览器。');
       return;
     }
 
@@ -47,7 +47,7 @@ function Exporter() {
     });
 
     if (photosToExport.length === 0) {
-      alert('请至少选择一个分类进行导出!');
+      toast.warning('请至少选择一个分类进行导出!');
       return;
     }
 
@@ -83,7 +83,7 @@ function Exporter() {
 
       // 如果用户取消了选择
       if (result.cancelled) {
-        alert('导出已取消');
+        toast.info('导出已取消');
         return;
       }
 
@@ -117,13 +117,13 @@ function Exporter() {
           }
         }
 
-        alert(message);
+        toast.success(message.replace(/\n/g, ' | '));
       } else {
-        alert('没有成功导出任何文件，请检查文件是否存在或浏览器权限设置。');
+        toast.error('没有成功导出任何文件，请检查文件是否存在或浏览器权限设置。');
       }
     } catch (error) {
       console.error('导出失败:', error);
-      alert(`导出失败: ${error.message}\n\n请确保:\n1. 使用 Chrome 或 Edge 浏览器\n2. 授予了文件夹写入权限\n3. 磁盘空间充足`);
+      toast.error(`导出失败: ${error.message} | 请确保: 1.使用Chrome/Edge 2.授予写入权限 3.磁盘空间充足`);
     } finally {
       setExporting(false);
       setProgress({ current: 0, total: 0 });

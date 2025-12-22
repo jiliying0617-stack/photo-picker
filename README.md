@@ -23,11 +23,31 @@
 ### 快速开始
 
 ```bash
+# 使用 make (推荐 - Linux 风格)
+make install
+make dev
+
+# 或使用 npm
 npm install
 npm run dev
 ```
 
 打开 `localhost:5173`。拖个文件夹进去。开始按 1/2/3。
+
+### Make 命令
+
+项目使用 Makefile 简化常用操作 (Linux 最佳实践):
+
+```bash
+make help        # 显示所有命令
+make install     # 安装依赖
+make dev         # 启动开发服务器
+make build       # 构建生产版本
+make preview     # 预览生产构建
+make lint        # 运行代码检查
+make clean       # 清理构建产物
+make clean-all   # 清理所有文件(包括 node_modules)
+```
 
 ### 键盘操作
 

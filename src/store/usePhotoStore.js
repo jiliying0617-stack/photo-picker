@@ -62,6 +62,7 @@ const usePhotoStore = create((set, get) => ({
   columns: loadColumns(),
   selectedPhotoId: null,
   categories: loadCategories(), // { path: category }
+  groupBrowseMode: false, // 检索组模式
 
   // Actions
   setPhotos: (photos) => {
@@ -178,6 +179,8 @@ const usePhotoStore = create((set, get) => ({
   },
 
   setSelectedPhotoId: (photoId) => set({ selectedPhotoId: photoId }),
+
+  setGroupBrowseMode: (enabled) => set({ groupBrowseMode: enabled }),
 
   clearPhotos: () => {
     set({ photos: [], folderMap: {}, selectedPhotoId: null });

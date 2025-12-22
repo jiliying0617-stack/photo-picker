@@ -1,0 +1,34 @@
+# Photo Picker - Project Structure
+#
+# Linux-style optimized project layout
+#
+# Core directories:
+#   src/             - Source code
+#   src/components/  - React components  
+#   src/store/       - State management (Zustand)
+#   src/utils/       - Utility functions
+#   public/          - Static assets
+#
+# Build files:
+#   vite.config.js   - Build configuration
+#   package.json     - Dependencies
+#   Makefile         - Build automation (Linux style)
+#
+# Style:
+#   tailwind.config.js - Tailwind CSS config
+#   postcss.config.js  - PostCSS config
+#   index.css          - Global styles
+#
+# Linting:
+#   eslint.config.js - ESLint configuration
+#
+# Quick commands:
+#   make help        - Show all commands
+#   make dev         - Start dev server
+#   make build       - Build for production
+#   make clean       - Remove build artifacts
+#
+# Philosophy:
+#   - Simple over complex
+#   - Fast over fancy
+#   - Reliable over clever

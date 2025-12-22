@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/', // 使用根路径，适配多种部署平台
+  base: './', // 使用相对路径，适配本地文件打开
   build: {
     outDir: 'dist',
     assetsDir: 'assets',

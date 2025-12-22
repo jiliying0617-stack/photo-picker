@@ -2,13 +2,15 @@ import usePhotoStore from '../store/usePhotoStore';
 import FileImporter from './FileImporter';
 import Exporter from './Exporter';
 
-function Toolbar() {
+function Toolbar({ toast }) {
   const columns = usePhotoStore((state) => state.columns);
   const setColumns = usePhotoStore((state) => state.setColumns);
   const clearPhotos = usePhotoStore((state) => state.clearPhotos);
   const clearCategories = usePhotoStore((state) => state.clearCategories);
   const photos = usePhotoStore((state) => state.photos);
   const categories = usePhotoStore((state) => state.categories);
+  const groupBrowseMode = usePhotoStore((state) => state.groupBrowseMode);
+  const setGroupBrowseMode = usePhotoStore((state) => state.setGroupBrowseMode);
 
   const columnOptions = [2, 3, 5];
 
@@ -58,11 +60,27 @@ function Toolbar() {
               </button>
             ))}
           </div>
+
+          {/* 检索组模式切换 */}
+          <button
+            onClick={() => setGroupBrowseMode(!groupBrowseMode)}
+            className={`
+              px-4 py-2 rounded-xl font-medium text-sm
+              transition-all duration-200
+              ${groupBrowseMode
+                ? 'neu-pressed text-purple-600'
+                : 'neu-button text-gray-600 hover:text-gray-800'
+              }
+            `}
+            title="开启后可按组快速浏览和跳转照片"
+          >
+            {groupBrowseMode ? '🔍 检索组模式' : '🔍 检索组'}
+          </button>
         </div>
 
         {/* 右侧操作 */}
         <div className="flex items-center gap-4">
-          <FileImporter />
+          <FileImporter toast={toast} />
           {categoryCount > 0 && (
             <button
               onClick={handleClearCategories}
@@ -72,7 +90,7 @@ function Toolbar() {
               清空标签 ({categoryCount})
             </button>
           )}
-          <Exporter />
+          <Exporter toast={toast} />
           {photos.length > 0 && (
             <button
               onClick={handleClear}
