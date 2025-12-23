@@ -131,14 +131,24 @@ a {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 减少视觉混乱 - 统一focus样式 */
+/* 移除所有高亮效果 */
 *:focus {
   outline: none;
 }
 
 *:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
+  outline: none;
+}
+
+/* 禁用文字选中高亮 */
+::selection {
+  background: transparent;
+  color: inherit;
+}
+
+::-moz-selection {
+  background: transparent;
+  color: inherit;
 }
 
 /* 优化图片加载体验 */

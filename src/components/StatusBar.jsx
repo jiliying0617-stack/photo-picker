@@ -94,7 +94,7 @@ const StatusBar = memo(function StatusBar({ isCompareMode = false, enableGroupNa
                   onChange={(e) => onJumpToGroupChange(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="#"
-                  className="w-14 px-2 py-1 neu-concave rounded text-sm text-center text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="w-14 px-2 py-1 neu-concave rounded text-sm text-center text-gray-700 font-medium focus:outline-none"
                   title="输入组号跳转"
                 />
                 <button
