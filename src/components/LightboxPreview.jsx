@@ -165,10 +165,11 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, photosWithUrls.photos]);
 
-  // Q键切换相邻对比模式
+  // Q键按住对比，松开恢复
   useEffect(() => {
-    const handleQKey = (e) => {
+    const handleKeyDown = (e) => {
       if (e.key === 'q' || e.key === 'Q') {
+        if (e.repeat) return; // 忽略长按重复事件
         e.preventDefault();
 
         // 计算真实照片总数（过滤null）
@@ -184,23 +185,30 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
           return;
         }
 
-        // 切换对比模式
-        setIsCompareMode(prev => {
-          const newMode = !prev;
-          setFlashMessage({
-            text: newMode
-              ? `🔀 相邻循环对比：${realPhotos.length}张图片全部对比`
-              : '已退出对比模式',
-            color: newMode ? 'bg-purple-600' : 'bg-gray-600'
-          });
-          setTimeout(() => setFlashMessage(null), 1500);
-          return newMode;
+        // 按下Q：开启对比模式
+        setIsCompareMode(true);
+        setFlashMessage({
+          text: `🔀 叠图对比：${realPhotos.length}张图片相邻对比`,
+          color: 'bg-purple-600'
         });
+        setTimeout(() => setFlashMessage(null), 1500);
       }
     };
 
-    window.addEventListener('keydown', handleQKey);
-    return () => window.removeEventListener('keydown', handleQKey);
+    const handleKeyUp = (e) => {
+      if (e.key === 'q' || e.key === 'Q') {
+        e.preventDefault();
+        // 松开Q：关闭对比模式
+        setIsCompareMode(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, [photosWithUrls.photos]);
 
   // 鼠标滚轮缩放
@@ -308,7 +316,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
           )}
           <span className="text-gray-400 text-xs">
             {allPhotos && totalGroups > 1 ? '↑↓切换组 · ' : ''}
-            Q相邻对比 · 滚轮缩放 · 拖拽平移 · R键重置
+            按住Q叠图对比 · 滚轮缩放 · 拖拽平移 · R键重置
           </span>
         </div>
 
@@ -457,51 +465,43 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
                 {/* 图片容器 - 可缩放和平移 */}
                 <div className="w-full h-full flex items-center justify-center relative">
-                  {/* 相邻循环对比模式 */}
+                  {/* 相邻循环对比模式 - 叠图显示 */}
                   {isCompareMode && nextPhoto ? (
-                    <div className="w-full h-full flex">
-                      {/* 左半边：当前图片 */}
-                      <div className="w-1/2 h-full flex items-center justify-center border-r-2 border-purple-500 relative">
-                        <img
-                          ref={el => imagesRef.current[idx] = el}
-                          src={photo.thumbnailUrl}
-                          alt={photo.name}
-                          className="max-w-full max-h-full object-contain"
-                          style={{
-                            transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
-                            transformOrigin: 'center center',
-                            willChange: isPanning ? 'transform' : 'auto',
-                          }}
-                          draggable={false}
-                        />
-                        {/* 左侧标签 */}
-                        <div className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
-                          左：第 {currentRealIdx + 1} 张
-                        </div>
-                      </div>
+                    <div className="w-full h-full flex items-center justify-center relative">
+                      {/* 底层：当前图片 */}
+                      <img
+                        ref={el => imagesRef.current[idx] = el}
+                        src={photo.thumbnailUrl}
+                        alt={photo.name}
+                        className="max-w-full max-h-full object-contain absolute"
+                        style={{
+                          transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                          transformOrigin: 'center center',
+                          willChange: isPanning ? 'transform' : 'auto',
+                          opacity: 1,
+                          zIndex: 1,
+                        }}
+                        draggable={false}
+                      />
 
-                      {/* 右半边：下一张图片（循环） */}
-                      <div className="w-1/2 h-full flex items-center justify-center relative">
-                        <img
-                          src={nextPhoto.thumbnailUrl}
-                          alt={nextPhoto.name}
-                          className="max-w-full max-h-full object-contain"
-                          style={{
-                            transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
-                            transformOrigin: 'center center',
-                            willChange: isPanning ? 'transform' : 'auto',
-                          }}
-                          draggable={false}
-                        />
-                        {/* 右侧标签 */}
-                        <div className="absolute top-2 right-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-bold">
-                          右：第 {nextRealIdx + 1} 张
-                        </div>
-                      </div>
+                      {/* 顶层：下一张图片（叠加） */}
+                      <img
+                        src={nextPhoto.thumbnailUrl}
+                        alt={nextPhoto.name}
+                        className="max-w-full max-h-full object-contain absolute"
+                        style={{
+                          transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                          transformOrigin: 'center center',
+                          willChange: isPanning ? 'transform' : 'auto',
+                          opacity: 1,
+                          zIndex: 2,
+                        }}
+                        draggable={false}
+                      />
 
-                      {/* 中央分隔指示器 */}
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-purple-600 text-white px-3 py-1.5 rounded-full text-xs font-bold pointer-events-none shadow-lg z-10">
-                        VS
+                      {/* 对比标签 */}
+                      <div className="absolute top-2 left-2 bg-purple-600/90 text-white px-2 py-1 rounded text-xs font-bold z-10">
+                        第 {currentRealIdx + 1} 张 ⇄ 第 {nextRealIdx + 1} 张
                       </div>
                     </div>
                   ) : (
@@ -534,7 +534,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       {/* 底部提示栏 - 固定高度 */}
       <div className="h-10 bg-black/80 flex items-center justify-center gap-8 px-6 text-xs text-gray-400 flex-shrink-0">
         <span>← → 切换</span>
-        <span className="text-purple-400">按Q 相邻循环对比</span>
+        <span className="text-purple-400">按住Q 叠图对比</span>
         <span>滚轮 缩放</span>
         <span>拖拽 平移</span>
         <span>R 重置</span>

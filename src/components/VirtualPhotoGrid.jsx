@@ -227,7 +227,10 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
             key={photo.id}
             ref={(el) => setPhotoRef && setPhotoRef(photo.id, el)}
             data-photo-id={photo.id}
-            className={`photo-item neu-card rounded-2xl overflow-hidden ${isBoxSelected ? 'ring-4 ring-blue-500' : ''}`}
+            className={`photo-item neu-card rounded-2xl overflow-hidden ${
+              isBoxSelected ? 'ring-4 ring-blue-500' :
+              isSelected ? 'ring-4 ring-green-500 shadow-lg shadow-green-500/50' : ''
+            }`}
           >
             {isCompareMode && (
               <div className="p-2 bg-[#e0e5ec] border-b border-gray-300">
