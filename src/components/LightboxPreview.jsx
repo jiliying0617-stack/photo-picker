@@ -8,7 +8,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [flashMessage, setFlashMessage] = useState(null); // 标签切换提示
   const [contextMenu, setContextMenu] = useState(null); // 右键菜单 { x, y, photoId }
-  const [overlayPairIndex, setOverlayPairIndex] = useState(-1); // 叠图对比模式：-1表示关闭，>=0表示当前对比对的索引
+  const [isCompareMode, setIsCompareMode] = useState(false); // 相邻对比模式：true表示开启全图相邻对比
   const setCategory = usePhotoStore((state) => state.setCategory);
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
 
@@ -165,14 +165,11 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, photosWithUrls.photos]);
 
-  // Q键按住/松开对比功能
+  // Q键切换相邻对比模式
   useEffect(() => {
-    let isQPressed = false;
-
-    const handleQKeyDown = (e) => {
-      if ((e.key === 'q' || e.key === 'Q') && !isQPressed) {
+    const handleQKey = (e) => {
+      if (e.key === 'q' || e.key === 'Q') {
         e.preventDefault();
-        isQPressed = true;
 
         // 计算真实照片总数（过滤null）
         const realPhotos = photosWithUrls.photos.filter(p => p);
@@ -187,35 +184,23 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
           return;
         }
 
-        // 按下Q键，开启对比模式（第1张 vs 最后1张）
-        setOverlayPairIndex(0);
-        const leftIdx = 0;
-        const rightIdx = realPhotos.length - 1;
-        setFlashMessage({
-          text: `🔀 按住Q对比：第 ${leftIdx + 1} 张 vs 第 ${rightIdx + 1} 张`,
-          color: 'bg-purple-600'
+        // 切换对比模式
+        setIsCompareMode(prev => {
+          const newMode = !prev;
+          setFlashMessage({
+            text: newMode
+              ? `🔀 相邻循环对比：${realPhotos.length}张图片全部对比`
+              : '已退出对比模式',
+            color: newMode ? 'bg-purple-600' : 'bg-gray-600'
+          });
+          setTimeout(() => setFlashMessage(null), 1500);
+          return newMode;
         });
       }
     };
 
-    const handleQKeyUp = (e) => {
-      if (e.key === 'q' || e.key === 'Q') {
-        e.preventDefault();
-        isQPressed = false;
-
-        // 松开Q键，退出对比模式
-        setOverlayPairIndex(-1);
-        setFlashMessage(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleQKeyDown);
-    window.addEventListener('keyup', handleQKeyUp);
-
-    return () => {
-      window.removeEventListener('keydown', handleQKeyDown);
-      window.removeEventListener('keyup', handleQKeyUp);
-    };
+    window.addEventListener('keydown', handleQKey);
+    return () => window.removeEventListener('keydown', handleQKey);
   }, [photosWithUrls.photos]);
 
   // 鼠标滚轮缩放
@@ -316,19 +301,14 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
             </span>
           )}
           <span className="text-blue-400">缩放: {(scale * 100).toFixed(0)}%</span>
-          {overlayPairIndex >= 0 && (() => {
-            const realPhotos = photosWithUrls.photos.filter(p => p);
-            const leftIdx = overlayPairIndex;
-            const rightIdx = realPhotos.length - 1 - overlayPairIndex;
-            return (
-              <span className="text-purple-400 font-bold animate-pulse">
-                🔀 左右对比：第 {leftIdx + 1} 张 vs 第 {rightIdx + 1} 张
-              </span>
-            );
-          })()}
+          {isCompareMode && (
+            <span className="text-purple-400 font-bold animate-pulse">
+              🔀 相邻循环对比模式
+            </span>
+          )}
           <span className="text-gray-400 text-xs">
             {allPhotos && totalGroups > 1 ? '↑↓切换组 · ' : ''}
-            按住Q左右对比 · 滚轮缩放 · 拖拽平移 · R键重置
+            Q相邻对比 · 滚轮缩放 · 拖拽平移 · R键重置
           </span>
         </div>
 
@@ -442,27 +422,11 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
               });
             };
 
-            // 计算是否在对比模式中
+            // 计算相邻对比（循环）
             const realPhotos = photosWithUrls.photos.filter(p => p);
-            const leftCompareIdx = overlayPairIndex;
-            const rightCompareIdx = realPhotos.length - 1 - overlayPairIndex;
-            const isLeftCompare = overlayPairIndex >= 0 && idx === leftCompareIdx; // 是否是左侧对比格子
-            const isRightCompare = overlayPairIndex >= 0 && idx === rightCompareIdx; // 是否是右侧对比格子
-
-            // 如果是右侧对比格子，显示提示
-            if (isRightCompare) {
-              return (
-                <div
-                  key={photo.id}
-                  className="relative bg-black overflow-hidden opacity-20"
-                >
-                  <div className="w-full h-full flex items-center justify-center flex-col gap-2 text-gray-500 text-sm">
-                    <div className="text-4xl">➡️</div>
-                    <div>已移至第 {leftCompareIdx + 1} 格左右对比</div>
-                  </div>
-                </div>
-              );
-            }
+            const currentRealIdx = realPhotos.findIndex(p => p && p.id === photo.id);
+            const nextRealIdx = currentRealIdx >= 0 ? (currentRealIdx + 1) % realPhotos.length : -1;
+            const nextPhoto = nextRealIdx >= 0 ? realPhotos[nextRealIdx] : null;
 
             return (
               <div
@@ -493,8 +457,8 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
                 {/* 图片容器 - 可缩放和平移 */}
                 <div className="w-full h-full flex items-center justify-center relative">
-                  {/* 如果是左侧对比格子，显示左右分屏对比 */}
-                  {isLeftCompare && photosWithUrls.photos[rightCompareIdx] ? (
+                  {/* 相邻循环对比模式 */}
+                  {isCompareMode && nextPhoto ? (
                     <div className="w-full h-full flex">
                       {/* 左半边：当前图片 */}
                       <div className="w-1/2 h-full flex items-center justify-center border-r-2 border-purple-500 relative">
@@ -512,15 +476,15 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         />
                         {/* 左侧标签 */}
                         <div className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
-                          左：第 {leftCompareIdx + 1} 张
+                          左：第 {currentRealIdx + 1} 张
                         </div>
                       </div>
 
-                      {/* 右半边：对比图片 */}
+                      {/* 右半边：下一张图片（循环） */}
                       <div className="w-1/2 h-full flex items-center justify-center relative">
                         <img
-                          src={photosWithUrls.photos[rightCompareIdx].thumbnailUrl}
-                          alt={photosWithUrls.photos[rightCompareIdx].name}
+                          src={nextPhoto.thumbnailUrl}
+                          alt={nextPhoto.name}
                           className="max-w-full max-h-full object-contain"
                           style={{
                             transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
@@ -531,7 +495,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         />
                         {/* 右侧标签 */}
                         <div className="absolute top-2 right-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-bold">
-                          右：第 {rightCompareIdx + 1} 张
+                          右：第 {nextRealIdx + 1} 张
                         </div>
                       </div>
 
@@ -570,7 +534,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       {/* 底部提示栏 - 固定高度 */}
       <div className="h-10 bg-black/80 flex items-center justify-center gap-8 px-6 text-xs text-gray-400 flex-shrink-0">
         <span>← → 切换</span>
-        <span className="text-purple-400">按住Q 左右对比</span>
+        <span className="text-purple-400">按Q 相邻循环对比</span>
         <span>滚轮 缩放</span>
         <span>拖拽 平移</span>
         <span>R 重置</span>
