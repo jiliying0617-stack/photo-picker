@@ -97,6 +97,7 @@ async function processDirectoryEntry(directoryEntry, path, photos, onProgress, p
   });
 
   for (const entry of entries) {
+    // 注意: 浏览器 File System Access API 在所有平台（包括 Windows）上都使用 '/' 作为路径分隔符
     const entryPath = path ? `${path}/${entry.name}` : entry.name;
 
     if (entry.isFile) {
@@ -148,6 +149,7 @@ export async function importFolder(onProgress) {
     // Recursively read files
     async function processDirectory(directoryHandle, path = '') {
       for await (const entry of directoryHandle.values()) {
+        // 注意: 浏览器 File System Access API 在所有平台（包括 Windows）上都使用 '/' 作为路径分隔符
         const entryPath = path ? `${path}/${entry.name}` : entry.name;
 
         if (entry.kind === 'file' && isImageFile(entry.name)) {
@@ -221,14 +223,38 @@ function sanitizeName(name, keepSpecialChars = true) {
     cleaned = cleaned.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s._\-()[\]{}!@#$%^&+=~`',；。，、！？—…（）【】]/g, '_');
   }
 
-  // 确保文件名不以点开头（避免隐藏文件）
-  cleaned = cleaned.replace(/^\.+/, '');
+  // 处理特殊的点开头情况（Linux 隐藏文件）
+  // 只替换单独的 '.' 或 '..'，保留合法的隐藏文件名如 '.profile.jpg'
+  if (cleaned === '.') cleaned = 'dot';
+  else if (cleaned === '..') cleaned = 'dotdot';
+  else if (cleaned.startsWith('.') && cleaned.length > 1) {
+    // 保留以点开头的合法文件名（如 .config.jpg）
+    // 但确保不是纯点号
+    if (cleaned.replace(/\./g, '').length === 0) {
+      cleaned = 'dots';
+    }
+  }
 
-  // 限制长度（大多数文件系统限制为255字节）
-  if (cleaned.length > 200) {
+  // 限制长度（文件系统限制为 255 字节，而非字符数）
+  // 使用 TextEncoder 来精确计算 UTF-8 字节数
+  const encoder = new TextEncoder();
+  let bytes = encoder.encode(cleaned);
+
+  if (bytes.length > 255) {
+    // 需要截断 - 保留扩展名
     const ext = cleaned.match(/\.[^.]+$/)?.[0] || '';
-    const nameWithoutExt = cleaned.slice(0, -ext.length);
-    cleaned = nameWithoutExt.slice(0, 200 - ext.length) + ext;
+    const extBytes = encoder.encode(ext);
+    const maxNameBytes = 255 - extBytes.length;
+
+    // 逐字符截断直到字节数符合要求
+    const nameWithoutExt = cleaned.slice(0, -ext.length || undefined);
+    let truncated = nameWithoutExt;
+
+    while (encoder.encode(truncated).length > maxNameBytes && truncated.length > 0) {
+      truncated = truncated.slice(0, -1);
+    }
+
+    cleaned = truncated + ext;
   }
 
   return cleaned || 'unnamed';
@@ -276,6 +302,12 @@ export async function exportPhotos(photos, selectedCategories, onProgress, optio
 
     let exported = 0;
     const errors = [];
+    const exportedByCategory = {
+      correct: 0,
+      medium: 0,
+      wrong: 0,
+      uncategorized: 0
+    };
 
     for (const photo of photos) {
       try {
@@ -289,6 +321,7 @@ export async function exportPhotos(photos, selectedCategories, onProgress, optio
         // 如果保留文件夹结构
         if (keepFolderStructure) {
           // 解析原文件路径，保持文件夹结构
+          // 注意: File System Access API 统一使用 '/' 作为分隔符（跨平台）
           const pathParts = photo.path.split('/');
           pathParts.pop(); // 移除文件名
 
@@ -337,6 +370,10 @@ export async function exportPhotos(photos, selectedCategories, onProgress, optio
         await writable.close();
 
         exported++;
+        // 统计每个分类的导出数量
+        if (exportedByCategory[categoryKey] !== undefined) {
+          exportedByCategory[categoryKey]++;
+        }
         if (onProgress) {
           onProgress({ current: exported, total: photos.length });
         }
@@ -351,7 +388,8 @@ export async function exportPhotos(photos, selectedCategories, onProgress, optio
       exported,
       total: photos.length,
       folderName: targetDir.name,
-      errors: errors.length > 0 ? errors : null
+      errors: errors.length > 0 ? errors : null,
+      exportedByCategory // 新增：按分类的导出数量
     };
   } catch (error) {
     if (error.name === 'AbortError') {
