@@ -20,6 +20,18 @@ const Exporter = memo(function Exporter({ toast }) {
   const photos = usePhotoStore((state) => state.photos);
   const getStats = usePhotoStore((state) => state.getStats);
 
+  // 计算实际可导出的照片数量（只统计有 file 对象的照片）
+  const getExportableStats = () => {
+    const photosWithFile = photos.filter(p => p.file);
+    return {
+      total: photosWithFile.length,
+      correct: photosWithFile.filter(p => p.category === 'correct').length,
+      medium: photosWithFile.filter(p => p.category === 'medium').length,
+      wrong: photosWithFile.filter(p => p.category === 'wrong').length,
+      uncategorized: photosWithFile.filter(p => !p.category).length,
+    };
+  };
+
   const handleOpenModal = () => {
     if (photos.length === 0) {
       toast.warning('没有图片可导出!');
@@ -156,6 +168,7 @@ const Exporter = memo(function Exporter({ toast }) {
   };
 
   const stats = getStats();
+  const exportableStats = getExportableStats(); // 实际可导出的照片数量
   const hasPhotos = photos.length > 0;
 
   return (
@@ -192,6 +205,16 @@ const Exporter = memo(function Exporter({ toast }) {
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800 mb-2">选择导出分类</h2>
               <p className="text-sm text-gray-500">保持原文件夹结构导出</p>
+              {stats.total > exportableStats.total && (
+                <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <p className="text-xs text-orange-700">
+                    ⚠️ 检测到 {stats.total - exportableStats.total} 张图片缺少文件对象，将无法导出
+                  </p>
+                  <p className="text-xs text-orange-600 mt-1">
+                    建议：重新导入文件夹后再导出
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* 导出选项 */}
@@ -244,7 +267,7 @@ const Exporter = memo(function Exporter({ toast }) {
                     </div>
                     <div className="text-left">
                       <div className="font-medium text-gray-800">正确</div>
-                      <div className="text-xs text-gray-500">{stats.correct} 张图片</div>
+                      <div className="text-xs text-gray-500">{exportableStats.correct} 张可导出</div>
                     </div>
                   </div>
                   <div className="text-2xl">✓</div>
@@ -268,7 +291,7 @@ const Exporter = memo(function Exporter({ toast }) {
                     </div>
                     <div className="text-left">
                       <div className="font-medium text-gray-800">适中</div>
-                      <div className="text-xs text-gray-500">{stats.medium} 张图片</div>
+                      <div className="text-xs text-gray-500">{exportableStats.medium} 张可导出</div>
                     </div>
                   </div>
                   <div className="text-2xl">~</div>
@@ -292,7 +315,7 @@ const Exporter = memo(function Exporter({ toast }) {
                     </div>
                     <div className="text-left">
                       <div className="font-medium text-gray-800">错误</div>
-                      <div className="text-xs text-gray-500">{stats.wrong} 张图片</div>
+                      <div className="text-xs text-gray-500">{exportableStats.wrong} 张可导出</div>
                     </div>
                   </div>
                   <div className="text-2xl">✕</div>
@@ -316,7 +339,7 @@ const Exporter = memo(function Exporter({ toast }) {
                     </div>
                     <div className="text-left">
                       <div className="font-medium text-gray-800">未打标</div>
-                      <div className="text-xs text-gray-500">{stats.uncategorized} 张图片</div>
+                      <div className="text-xs text-gray-500">{exportableStats.uncategorized} 张可导出</div>
                     </div>
                   </div>
                   <div className="text-2xl text-gray-500">○</div>
