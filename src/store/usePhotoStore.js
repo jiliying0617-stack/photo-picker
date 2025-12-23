@@ -310,6 +310,102 @@ const usePhotoStore = create((set, get) => ({
     const photos = get().photos;
     return photos.filter(p => p.category);
   },
+
+  // 🔍 诊断工具：检查数据完整性
+  diagnose: () => {
+    const photos = get().photos;
+    const categories = get().categories;
+
+    console.group('🔍 数据诊断报告');
+
+    // 1. 检查重复 ID
+    const idMap = new Map();
+    const duplicateIds = [];
+    photos.forEach(photo => {
+      if (idMap.has(photo.id)) {
+        duplicateIds.push({
+          id: photo.id,
+          paths: [idMap.get(photo.id), photo.path]
+        });
+      } else {
+        idMap.set(photo.id, photo.path);
+      }
+    });
+
+    // 2. 检查重复 path
+    const pathMap = new Map();
+    const duplicatePaths = [];
+    photos.forEach(photo => {
+      if (pathMap.has(photo.path)) {
+        duplicatePaths.push({
+          path: photo.path,
+          ids: [pathMap.get(photo.path), photo.id]
+        });
+      } else {
+        pathMap.set(photo.path, photo.id);
+      }
+    });
+
+    // 3. 按分类分组
+    const byCategory = {
+      correct: [],
+      medium: [],
+      wrong: [],
+      uncategorized: []
+    };
+    photos.forEach(photo => {
+      const cat = photo.category || 'uncategorized';
+      if (byCategory[cat]) {
+        byCategory[cat].push({
+          id: photo.id,
+          path: photo.path,
+          name: photo.name,
+          size: photo.size,
+          lastModified: photo.lastModified
+        });
+      }
+    });
+
+    // 4. 输出报告
+    console.log('📊 总览');
+    console.log(`  总照片数: ${photos.length}`);
+    console.log(`  categories 映射数: ${Object.keys(categories).length}`);
+
+    console.log('\n📈 分类统计');
+    console.log(`  ✓ 正确: ${byCategory.correct.length} 张`);
+    console.log(`  ~ 适中: ${byCategory.medium.length} 张`);
+    console.log(`  ✕ 错误: ${byCategory.wrong.length} 张`);
+    console.log(`  ○ 未标记: ${byCategory.uncategorized.length} 张`);
+
+    if (duplicateIds.length > 0) {
+      console.log('\n⚠️ 重复的照片 ID:');
+      console.table(duplicateIds);
+    }
+
+    if (duplicatePaths.length > 0) {
+      console.log('\n⚠️ 重复的照片路径:');
+      console.table(duplicatePaths);
+    }
+
+    console.log('\n📋 "正确" 分类的照片列表:');
+    console.table(byCategory.correct);
+
+    console.groupEnd();
+
+    return {
+      summary: {
+        totalPhotos: photos.length,
+        categoriesCount: Object.keys(categories).length,
+        correct: byCategory.correct.length,
+        medium: byCategory.medium.length,
+        wrong: byCategory.wrong.length,
+        uncategorized: byCategory.uncategorized.length
+      },
+      duplicateIds,
+      duplicatePaths,
+      correctPhotos: byCategory.correct
+    };
+  },
 }));
 
 export default usePhotoStore;
