@@ -23,15 +23,20 @@ const Toolbar = memo(function Toolbar({ toast }) {
   };
 
   const handleClearCategories = () => {
-    const categoryCount = Object.keys(categories).length;
+    // 正确统计：计算 photos 数组中有多少张照片有分类
+    const categorizedPhotos = photos.filter(p => p.category);
+    const categoryCount = categorizedPhotos.length;
+
     if (categoryCount === 0) return;
-    if (confirm(`确定要清空所有分类标签吗?\n共 ${categoryCount} 个标签\n(图片将保留，只清除标签)`)) {
+    if (confirm(`确定要清空所有分类标签吗?\n共 ${categoryCount} 张照片有标签\n(图片将保留，只清除标签)`)) {
       clearCategories();
-      // 不清空图片，只清空分类标签
+      toast.success(`已清空 ${categoryCount} 张照片的分类标签`);
     }
   };
 
-  const categoryCount = Object.keys(categories).length;
+  // 正确统计：计算 photos 数组中有多少张照片有分类
+  const categorizedPhotos = photos.filter(p => p.category);
+  const categoryCount = categorizedPhotos.length;
 
   return (
     <div className="bg-[#e0e5ec] px-8 py-6">
