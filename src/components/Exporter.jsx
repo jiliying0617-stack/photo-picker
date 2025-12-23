@@ -88,18 +88,36 @@ const Exporter = memo(function Exporter({ toast }) {
       }
 
       if (result.exported > 0) {
+        // 计算实际导出的每个分类的数量（只统计有 file 对象的照片）
+        const actualExportedStats = {
+          correct: 0,
+          medium: 0,
+          wrong: 0,
+          uncategorized: 0
+        };
+
+        photosToExport.forEach(photo => {
+          // 只统计有 file 对象的照片（实际导出的照片）
+          if (photo.file) {
+            const categoryKey = photo.category || 'uncategorized';
+            if (actualExportedStats[categoryKey] !== undefined) {
+              actualExportedStats[categoryKey]++;
+            }
+          }
+        });
+
         const exportedStats = [];
-        if (selectedCategories.correct && stats.correct > 0) {
-          exportedStats.push(`· 正确_Correct/ - ${stats.correct} 张`);
+        if (selectedCategories.correct && actualExportedStats.correct > 0) {
+          exportedStats.push(`· 正确_Correct/ - ${actualExportedStats.correct} 张`);
         }
-        if (selectedCategories.medium && stats.medium > 0) {
-          exportedStats.push(`· 适中_Medium/ - ${stats.medium} 张`);
+        if (selectedCategories.medium && actualExportedStats.medium > 0) {
+          exportedStats.push(`· 适中_Medium/ - ${actualExportedStats.medium} 张`);
         }
-        if (selectedCategories.wrong && stats.wrong > 0) {
-          exportedStats.push(`· 错误_Wrong/ - ${stats.wrong} 张`);
+        if (selectedCategories.wrong && actualExportedStats.wrong > 0) {
+          exportedStats.push(`· 错误_Wrong/ - ${actualExportedStats.wrong} 张`);
         }
-        if (selectedCategories.uncategorized && stats.uncategorized > 0) {
-          exportedStats.push(`· 未标记_Uncategorized/ - ${stats.uncategorized} 张`);
+        if (selectedCategories.uncategorized && actualExportedStats.uncategorized > 0) {
+          exportedStats.push(`· 未标记_Uncategorized/ - ${actualExportedStats.uncategorized} 张`);
         }
 
         let message = `导出完成!\n\n` +

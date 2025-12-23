@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useState } from 'react';
 import { COMPARE_MODE, COMPARE_TRANSITION } from '../constants';
+import { devLog, devWarn } from '../utils/devLog';
 
 /**
  * 对比模式逻辑 Hook
@@ -114,47 +115,35 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
     if (prevIsCompareModeRef.current && !isCompareMode) {
       const targetPhotoId = lastCompareModePhotoId || currentPhotoId;
 
-      console.log('🔄 对比模式退出，准备定位到照片:', targetPhotoId);
+      devLog('🔄 对比模式退出，准备定位到照片:', targetPhotoId);
 
       if (targetPhotoId) {
         // 增加延迟确保虚拟滚动完成重新渲染
         setTimeout(() => {
-          console.log('📍 开始滚动到目标照片:', targetPhotoId);
-
-          // 查找目标照片在filteredPhotos中的索引
           const photoIndex = filteredPhotos.findIndex(p => p && p.id === targetPhotoId);
 
           if (photoIndex >= 0) {
-            console.log('✅ 找到照片索引:', photoIndex, '总数:', filteredPhotos.length);
-
             // 优先使用虚拟网格的scrollToCell API（可靠性更高）
-            if (virtualGridRef && virtualGridRef.scrollToCell) {
+            if (virtualGridRef?.scrollToCell) {
               const rowIndex = Math.floor(photoIndex / columns);
               const columnIndex = photoIndex % columns;
 
-              console.log('🎯 使用虚拟网格滚动，行:', rowIndex, '列:', columnIndex);
+              devLog('🎯 使用虚拟网格滚动，行:', rowIndex, '列:', columnIndex);
 
-              try {
-                virtualGridRef.scrollToCell({
-                  rowIndex,
-                  columnIndex,
-                  rowAlign: 'start',
-                  behavior: 'smooth',
-                });
+              virtualGridRef.scrollToCell({
+                rowIndex,
+                columnIndex,
+                rowAlign: 'start',
+                behavior: 'smooth',
+              });
 
-                // 选中跳转后的图片
-                setTimeout(() => {
-                  if (setSelectedPhotoId) {
-                    setSelectedPhotoId(targetPhotoId);
-                  }
-                  console.log('✅ 滚动并选中完成');
-                }, 100);
-              } catch (error) {
-                console.error('❌ 虚拟网格滚动失败:', error);
-              }
+              setTimeout(() => {
+                if (setSelectedPhotoId) {
+                  setSelectedPhotoId(targetPhotoId);
+                }
+              }, 100);
             } else {
-              // 备用方案：使用scrollToPhoto（但在虚拟滚动中可能失败）
-              console.log('⚠️ 虚拟网格引用不可用，尝试DOM滚动');
+              // 备用方案：使用scrollToPhoto
               if (scrollToPhoto) {
                 scrollToPhoto(targetPhotoId, {
                   behavior: 'smooth',
@@ -166,13 +155,12 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
               }
             }
           } else {
-            console.warn('⚠️ 未找到目标照片，可能已被过滤');
+            devWarn('⚠️ 未找到目标照片，可能已被过滤');
           }
         }, COMPARE_TRANSITION.SCROLL_DELAY);
       } else if (filteredPhotos.length > 0) {
         // 如果没有目标照片，跳转到第一张照片
         const firstPhoto = filteredPhotos[0];
-        console.log('⚠️ 没有目标照片，跳转到第一张:', firstPhoto?.id);
 
         if (firstPhoto && virtualGridRef && virtualGridRef.scrollToCell) {
           setTimeout(() => {

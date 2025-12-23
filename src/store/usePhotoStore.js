@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { getUserStorageKey } from '../utils/userIdentity';
+import { devLog, devError } from '../utils/devLog';
+import { debounce, runWhenIdle } from '../utils/debounce';
 
 // 从 localStorage 加载列数配置
 function loadColumns() {
@@ -8,7 +10,7 @@ function loadColumns() {
     const savedColumns = localStorage.getItem(columnsKey);
     return savedColumns ? parseInt(savedColumns) : 3;
   } catch (error) {
-    console.error('加载列数失败:', error);
+    devError('加载列数失败:', error);
     return 3;
   }
 }
@@ -20,20 +22,22 @@ function loadCategories() {
     const savedCategories = localStorage.getItem(categoriesKey);
     return savedCategories ? JSON.parse(savedCategories) : {};
   } catch (error) {
-    console.error('加载分类标记失败:', error);
+    devError('加载分类标记失败:', error);
     return {};
   }
 }
 
-// 保存分类标记到 localStorage
-function saveCategories(categories) {
-  try {
-    const categoriesKey = getUserStorageKey('categories');
-    localStorage.setItem(categoriesKey, JSON.stringify(categories));
-  } catch (error) {
-    console.error('保存分类标记失败:', error);
-  }
-}
+// 保存分类标记到 localStorage (防抖 + 异步)
+const saveCategories = debounce((categories) => {
+  runWhenIdle(() => {
+    try {
+      const categoriesKey = getUserStorageKey('categories');
+      localStorage.setItem(categoriesKey, JSON.stringify(categories));
+    } catch (error) {
+      devError('保存分类标记失败:', error);
+    }
+  });
+}, 1000); // 1秒防抖，避免频繁写入
 
 // 提取文件夹路径的辅助函数
 function getFolderPath(photoPath) {
@@ -42,11 +46,11 @@ function getFolderPath(photoPath) {
   return parts.join('/');
 }
 
-// 构建文件夹映射表
+// 构建文件夹映射表 (使用预计算的 photo.folder)
 function buildFolderMap(photos) {
   const folderMap = {};
   photos.forEach(photo => {
-    const folder = getFolderPath(photo.path);
+    const folder = photo.folder; // 使用预计算的文件夹路径
     if (!folderMap[folder]) {
       folderMap[folder] = [];
     }
@@ -78,7 +82,7 @@ const usePhotoStore = create((set, get) => ({
     const folderMap = buildFolderMap(photosWithCategories);
 
     set({ photos: photosWithCategories, folderMap });
-    console.log(`✓ 加载了 ${photos.length} 张图片,恢复了 ${Object.keys(categories).length} 个分类标记`);
+    devLog(`✓ 加载了 ${photos.length} 张图片,恢复了 ${Object.keys(categories).length} 个分类标记`);
   },
 
   addPhotos: (newPhotos) => {
@@ -101,7 +105,7 @@ const usePhotoStore = create((set, get) => ({
     const folderMap = get().folderMap;
     const photo = photos.find(p => p.id === photoId);
     if (!photo) {
-      console.warn(`Photo not found: ${photoId}`);
+      devError(`Photo not found: ${photoId}`);
       return;
     }
 
@@ -111,7 +115,7 @@ const usePhotoStore = create((set, get) => ({
     );
 
     // 增量更新 folderMap - 只更新受影响的文件夹
-    const folder = getFolderPath(photo.path);
+    const folder = photo.folder; // 使用预计算的文件夹路径
     const newFolderMap = { ...folderMap };
     if (newFolderMap[folder]) {
       newFolderMap[folder] = newFolderMap[folder].map(p =>
@@ -171,7 +175,7 @@ const usePhotoStore = create((set, get) => ({
     set({ photos: updatedPhotos, folderMap: newFolderMap, categories });
     saveCategories(categories);
 
-    console.log(`✓ 批量更新 ${photoIds.length} 张图片的分类`);
+    devLog(`✓ 批量更新 ${photoIds.length} 张图片的分类`);
   },
 
   setColumns: (columns) => {
@@ -186,14 +190,14 @@ const usePhotoStore = create((set, get) => ({
 
   clearPhotos: () => {
     set({ photos: [], folderMap: {}, selectedPhotoId: null });
-    console.log('✓ 清空图片列表 (分类标记已保留)');
+    devLog('✓ 清空图片列表 (分类标记已保留)');
   },
 
   clearCategories: () => {
     set({ categories: {} });
     const categoriesKey = getUserStorageKey('categories');
     localStorage.removeItem(categoriesKey);
-    console.log('✓ 清空所有分类标记');
+    devLog('✓ 清空所有分类标记');
   },
 
   // Computed

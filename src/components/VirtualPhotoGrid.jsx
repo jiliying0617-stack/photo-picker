@@ -1,8 +1,7 @@
 import { memo, useRef, useEffect, useState, useCallback } from 'react';
 import { Grid } from 'react-window';
 import { getFileFormat, getFormatBadgeColor } from '../utils/imageUtils';
-// 暂时禁用懒加载，使用简单的 URL 创建
-// import { useLazyObjectUrls } from '../hooks/useLazyObjectUrls';
+import { useLRUObjectUrls } from '../hooks/useLRUObjectUrls';
 
 /**
  * 虚拟化照片网格组件
@@ -35,29 +34,9 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   const gridRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
-  // 暂时禁用懒加载，使用简单的 Object URL 管理
-  // const { getPhotoUrl, preloadUrls } = useLazyObjectUrls(allPhotos || photos);
-  const [objectUrls] = useState(() => new Map());
-
-  // 简化的 URL 管理：按需创建
-  const getPhotoUrl = useCallback((photo) => {
-    if (!photo || !photo.file) return null;
-
-    if (!objectUrls.has(photo.id)) {
-      const url = URL.createObjectURL(photo.file);
-      objectUrls.set(photo.id, url);
-    }
-
-    return objectUrls.get(photo.id);
-  }, [objectUrls]);
-
-  // 清理所有 URLs
-  useEffect(() => {
-    return () => {
-      objectUrls.forEach(url => URL.revokeObjectURL(url));
-      objectUrls.clear();
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // LRU 缓存的 Object URL 管理 - 防止内存泄漏
+  // 最多缓存 200 个 URL，自动淘汰最少使用的
+  const getPhotoUrl = useLRUObjectUrls(200);
 
   // 监听容器尺寸变化
   useEffect(() => {
@@ -248,11 +227,7 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
               onClick={(e) => handlePhotoClick(e, photo)}
               onDoubleClick={() => handlePhotoDoubleClick(photo, index)}
               onContextMenu={(e) => handleContextMenu(e, photo.id)}
-              className={`
-                relative group cursor-pointer
-                transition-all duration-200
-                ${isSelected ? 'scale-95' : 'hover:scale-105'}
-              `}
+              className="relative group cursor-pointer"
             >
               <div className="aspect-square neu-concave rounded-xl overflow-hidden bg-gray-100">
                 <img
@@ -370,7 +345,7 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
         defaultWidth={containerSize.width}
         rowCount={rowCount}
         rowHeight={rowHeight}
-        overscanCount={2}
+        overscanCount={5}
         onScroll={handleScroll}
         className="scrollbar-thin"
         style={{ padding: `${padding}px` }}

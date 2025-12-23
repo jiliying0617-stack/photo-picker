@@ -120,8 +120,7 @@ const FolderPanel = memo(function FolderPanel({ onFilterChange, onSelectedFolder
             onClick={(e) => handleFolderClick(folder.path, e)}
             className={`
               neu-card rounded-xl p-2 mb-2 cursor-pointer
-              transition-all duration-200
-              ${isSelected ? 'neu-pressed scale-95' : 'hover:scale-105'}
+              ${isSelected ? 'neu-pressed' : ''}
             `}
           >
             <div className="flex items-center gap-2">

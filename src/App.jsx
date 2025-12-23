@@ -20,6 +20,7 @@ import {
   usePhotoRefs,
 } from './hooks';
 import Toast from './components/Toast';
+import { devLog } from './utils/devLog';
 
 function App() {
   // Zustand store
@@ -87,7 +88,7 @@ function App() {
     (groupIndex) => {
       if (!enableGroupNavigation || groupIndex < 0 || groupIndex >= totalGroups) return;
 
-      console.log('🎯 跳转到组:', groupIndex, '/', totalGroups);
+      devLog('🎯 跳转到组:', groupIndex, '/', totalGroups);
 
       // 使用虚拟网格的 scrollToCell API 直接滚动到指定行
       if (virtualGridRef) {
@@ -147,7 +148,8 @@ function App() {
   if (photos.length === 0 || hasDataButNoImages) {
     return (
       <div className="h-screen flex flex-col bg-[#e0e5ec]">
-        <Toolbar />
+        <Toast toasts={toasts} onClose={closeToast} />
+        <Toolbar toast={{ success, error, warning, info }} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="w-32 h-32 mx-auto mb-6 neu-card rounded-3xl flex items-center justify-center">
@@ -275,65 +277,50 @@ function App() {
         <LightboxPreview
           photos={previewPhotos}
           initialIndex={0}
-          onClose={() => {
-            // 找到当前预览的第一张真实照片
-            const firstRealPhoto = previewPhotos.find(p => p && p.id);
+          onClose={(lastViewedPhotoId) => {
+            devLog('📥 App收到关闭请求，照片ID:', lastViewedPhotoId);
 
+            // ⚠️ 重要：必须在 closePreview() 之前查找照片，否则 previewPhotos 会被清空
+            const viewedPhoto = lastViewedPhotoId
+              ? previewPhotos.find(p => p && p.id === lastViewedPhotoId)
+              : previewPhotos.find(p => p && p.id); // 备用：第一张真实照片
+
+            // 如果没找到，尝试在 displayPhotos 中查找（备用方案）
+            let finalPhoto = viewedPhoto;
+            if (!finalPhoto && lastViewedPhotoId) {
+              finalPhoto = displayPhotos.find(p => p && p.id === lastViewedPhotoId);
+            }
+
+            // 然后再关闭预览
             closePreview();
             clearSelection();
 
             // 关闭预览后滚动到该照片位置
-            if (firstRealPhoto) {
+            if (finalPhoto) {
               setTimeout(() => {
-                // 查找照片在 displayPhotos 中的索引
-                const photoIndex = displayPhotos.findIndex(p => p && p.id === firstRealPhoto.id);
+                const photoIndex = displayPhotos.findIndex(p => p && p.id === finalPhoto.id);
 
-                if (photoIndex >= 0 && virtualGridRef && virtualGridRef.scrollToCell) {
-                  // 优先使用虚拟网格的 scrollToCell API（最可靠）
+                if (photoIndex >= 0 && virtualGridRef?.scrollToCell) {
                   const rowIndex = Math.floor(photoIndex / compareColumns);
                   const columnIndex = photoIndex % compareColumns;
 
-                  console.log('📍 关闭预览，跳转到照片:', firstRealPhoto.id, '位置:', rowIndex, columnIndex);
+                  devLog('📍 关闭预览，跳转到照片:', finalPhoto.id, '位置:', rowIndex, columnIndex);
 
-                  try {
-                    virtualGridRef.scrollToCell({
-                      rowIndex,
-                      columnIndex,
-                      rowAlign: 'center',
-                      columnAlign: 'center',
-                      behavior: 'smooth',
-                    });
-
-                    // 滚动后选中该照片
-                    setTimeout(() => {
-                      setSelectedPhotoId(firstRealPhoto.id);
-                      console.log('✅ 已选中照片:', firstRealPhoto.id);
-                    }, 200);
-                  } catch (error) {
-                    console.error('❌ 虚拟网格滚动失败:', error);
-                    // 备用方案：使用 DOM 滚动
-                    const success = scrollToPhoto(firstRealPhoto.id, {
-                      behavior: 'smooth',
-                      block: 'center',
-                    });
-                    if (success) {
-                      setSelectedPhotoId(firstRealPhoto.id);
-                    }
-                  }
-                } else {
-                  // 备用方案：使用 DOM 滚动
-                  console.log('⚠️ 虚拟网格不可用，使用DOM滚动');
-                  const success = scrollToPhoto(firstRealPhoto.id, {
+                  virtualGridRef.scrollToCell({
+                    rowIndex,
+                    columnIndex,
+                    rowAlign: 'center',
+                    columnAlign: 'center',
                     behavior: 'smooth',
-                    block: 'center',
                   });
-                  if (success) {
-                    setSelectedPhotoId(firstRealPhoto.id);
-                  }
+
+                  setTimeout(() => setSelectedPhotoId(finalPhoto.id), 200);
+                } else {
+                  // 备用方案：直接选中照片
+                  setSelectedPhotoId(finalPhoto.id);
                 }
-              }, 150); // 增加延迟，确保预览窗口完全关闭
+              }, 150);
             } else if (isCompareMode && currentPreviewGroupIndex >= 0) {
-              // 如果没有真实照片（都是占位符），回退到组位置
               setTimeout(() => scrollToGroup(currentPreviewGroupIndex), 150);
             }
           }}

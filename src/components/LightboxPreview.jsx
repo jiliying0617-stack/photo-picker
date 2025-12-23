@@ -6,9 +6,9 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   const [pan, setPan] = useState({ x: 0, y: 0 }); // 图片平移位置
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
-  const [flashMessage, setFlashMessage] = useState(null); // 标签切换提示
   const [contextMenu, setContextMenu] = useState(null); // 右键菜单 { x, y, photoId }
   const [isCompareMode, setIsCompareMode] = useState(false); // 相邻对比模式：true表示开启全图相邻对比
+  const [lastViewedPhotoId, setLastViewedPhotoId] = useState(null); // 追踪最后查看的照片ID
   const setCategory = usePhotoStore((state) => state.setCategory);
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
 
@@ -68,6 +68,13 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     panRef.current = pan;
   }, [pan]);
 
+  // 初始化最后查看的照片ID为第一张真实照片
+  useEffect(() => {
+    if (firstRealPhoto && !lastViewedPhotoId) {
+      setLastViewedPhotoId(firstRealPhoto.id);
+    }
+  }, [firstRealPhoto, lastViewedPhotoId]);
+
   // 切换到下一组
   // 重要：不过滤 null，保持占位符，严格按组顺序切换
   const handleNextGroup = useCallback(() => {
@@ -108,20 +115,6 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     photos.forEach(photo => {
       setCategory(photo.id, category);
     });
-
-    // 显示视觉反馈
-    const messages = {
-      correct: { text: '✓ 已标记为正确', color: 'bg-green-600' },
-      medium: { text: '~ 已标记为适中', color: 'bg-yellow-600' },
-      wrong: { text: '✕ 已标记为错误', color: 'bg-red-600' },
-      null: { text: '已清除标记', color: 'bg-gray-600' }
-    };
-
-    const message = messages[category];
-    if (message) {
-      setFlashMessage(message);
-      setTimeout(() => setFlashMessage(null), 1500); // 1.5秒后消失
-    }
   }, [photos, setCategory]);
 
   // 键盘快捷键
@@ -131,7 +124,8 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         if (contextMenu) {
           setContextMenu(null);
         } else {
-          onClose();
+          console.log('🚪 关闭预览，最后查看的照片ID:', lastViewedPhotoId);
+          onClose(lastViewedPhotoId);
         }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
@@ -163,7 +157,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, photosWithUrls.photos]);
+  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, photosWithUrls.photos, lastViewedPhotoId]);
 
   // Q键按住对比，松开恢复
   useEffect(() => {
@@ -177,21 +171,11 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
         if (realPhotos.length < 2) {
           // 少于2张照片，无法对比
-          setFlashMessage({
-            text: '至少需要2张照片才能对比',
-            color: 'bg-red-600'
-          });
-          setTimeout(() => setFlashMessage(null), 1500);
           return;
         }
 
         // 按下Q：开启对比模式
         setIsCompareMode(true);
-        setFlashMessage({
-          text: `🔀 叠图对比：${realPhotos.length}张图片相邻对比`,
-          color: 'bg-purple-600'
-        });
-        setTimeout(() => setFlashMessage(null), 1500);
       }
     };
 
@@ -380,7 +364,10 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
           </button>
 
           <button
-            onClick={onClose}
+            onClick={() => {
+              console.log('🚪 点击关闭按钮，最后查看的照片ID:', lastViewedPhotoId);
+              onClose(lastViewedPhotoId);
+            }}
             className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs font-medium transition-colors"
           >
             ESC 关闭
@@ -442,6 +429,10 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                 className="relative bg-black overflow-hidden"
                 style={{
                   cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
+                }}
+                onClick={() => {
+                  console.log('🖱️ 点击照片:', photo.id);
+                  setLastViewedPhotoId(photo.id);
                 }}
                 onMouseDown={handleMouseDown}
                 onContextMenu={handleContextMenu}
@@ -544,20 +535,6 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         <span>ESC 关闭</span>
       </div>
 
-      {/* 标签切换提示 - 中央浮动显示 */}
-      {flashMessage && (
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[60] pointer-events-none">
-          <div
-            className={`${flashMessage.color} text-white px-8 py-4 rounded-2xl text-2xl font-bold shadow-2xl animate-pulse`}
-            style={{
-              animation: 'fadeInOut 1.5s ease-in-out'
-            }}
-          >
-            {flashMessage.text}
-          </div>
-        </div>
-      )}
-
       {/* 右键菜单 */}
       {contextMenu && (
         <div
@@ -617,15 +594,6 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes fadeInOut {
-          0% { opacity: 0; transform: scale(0.8); }
-          20% { opacity: 1; transform: scale(1.1); }
-          80% { opacity: 1; transform: scale(1); }
-          100% { opacity: 0; transform: scale(0.9); }
-        }
-      `}</style>
     </div>
   );
 });

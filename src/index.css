@@ -9,10 +9,42 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: #e0e5ec;
+  /* 禁用文字选择高亮 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 * {
   box-sizing: border-box;
+  /* 禁用所有元素的文字选择 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 允许输入框选择文字 */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* 禁用双击缩放（移动端） */
+* {
+  touch-action: manipulation;
+}
+
+/* 禁用长按菜单 */
+img,
+button,
+a {
+  -webkit-touch-callout: none;
 }
 
 /* 新拟态效果 */
@@ -92,4 +124,34 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #8d9db6;
+}
+
+/* 优化过渡动画 */
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 减少视觉混乱 - 统一focus样式 */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* 优化图片加载体验 */
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* 防止拖拽图片 */
+img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
 }
