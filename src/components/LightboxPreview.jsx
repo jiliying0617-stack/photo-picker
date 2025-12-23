@@ -8,7 +8,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [flashMessage, setFlashMessage] = useState(null); // 标签切换提示
   const [contextMenu, setContextMenu] = useState(null); // 右键菜单 { x, y, photoId }
-  const [isOverlayMode, setIsOverlayMode] = useState(false); // 叠图对比模式
+  const [overlayPairIndex, setOverlayPairIndex] = useState(-1); // 叠图对比模式：-1表示关闭，>=0表示当前对比对的索引
   const setCategory = usePhotoStore((state) => state.setCategory);
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
 
@@ -157,19 +157,57 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         setPan({ x: 0, y: 0 });
       } else if (e.key === 'q' || e.key === 'Q') {
         e.preventDefault();
-        setIsOverlayMode(prev => !prev);
-        // 显示提示
-        setFlashMessage({
-          text: isOverlayMode ? '已退出叠图对比' : '🔀 叠图对比模式（从右到左）',
-          color: isOverlayMode ? 'bg-gray-600' : 'bg-purple-600'
-        });
-        setTimeout(() => setFlashMessage(null), 1500);
+
+        // 计算真实照片总数（过滤null）
+        const realPhotos = photosWithUrls.photos.filter(p => p);
+        const totalPairs = Math.max(0, realPhotos.length - 1); // 总共有n-1对
+
+        if (totalPairs === 0) {
+          // 少于2张照片，无法对比
+          setFlashMessage({
+            text: '至少需要2张照片才能叠图对比',
+            color: 'bg-red-600'
+          });
+          setTimeout(() => setFlashMessage(null), 1500);
+          return;
+        }
+
+        if (overlayPairIndex === -1) {
+          // 当前未开启叠图模式，开启并显示最右边的一对（倒数第2和最后1张）
+          setOverlayPairIndex(totalPairs - 1);
+          setFlashMessage({
+            text: `🔀 叠图对比：第 ${realPhotos.length - 1} & ${realPhotos.length} 张`,
+            color: 'bg-purple-600'
+          });
+          setTimeout(() => setFlashMessage(null), 1500);
+        } else {
+          // 已开启，切换到下一对（向左移动）
+          const nextIndex = overlayPairIndex - 1;
+
+          if (nextIndex < 0) {
+            // 已经到最左边，退出叠图模式
+            setOverlayPairIndex(-1);
+            setFlashMessage({
+              text: '已退出叠图对比',
+              color: 'bg-gray-600'
+            });
+            setTimeout(() => setFlashMessage(null), 1500);
+          } else {
+            // 切换到下一对
+            setOverlayPairIndex(nextIndex);
+            setFlashMessage({
+              text: `🔀 叠图对比：第 ${nextIndex + 1} & ${nextIndex + 2} 张`,
+              color: 'bg-purple-600'
+            });
+            setTimeout(() => setFlashMessage(null), 1500);
+          }
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, isOverlayMode]);
+  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, overlayPairIndex, photosWithUrls.photos]);
 
   // 鼠标滚轮缩放
   useEffect(() => {
@@ -269,14 +307,14 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
             </span>
           )}
           <span className="text-blue-400">缩放: {(scale * 100).toFixed(0)}%</span>
-          {isOverlayMode && (
+          {overlayPairIndex >= 0 && (
             <span className="text-purple-400 font-bold animate-pulse">
-              🔀 叠图对比模式
+              🔀 叠图对比：第 {overlayPairIndex + 1} & {overlayPairIndex + 2} 张
             </span>
           )}
           <span className="text-gray-400 text-xs">
             {allPhotos && totalGroups > 1 ? '↑↓切换组 · ' : ''}
-            Q叠图对比 · 滚轮缩放 · 拖拽平移 · R键重置
+            Q叠图对比(从右到左) · 滚轮缩放 · 拖拽平移 · R键重置
           </span>
         </div>
 
@@ -351,13 +389,9 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       {/* 主预览区 - 固定框架,图片在框内缩放 */}
       <div className="flex-1 overflow-hidden p-1">
         <div
-          className="h-full"
-          style={isOverlayMode ? {
-            position: 'relative',
-          } : {
-            display: 'grid',
+          className="h-full grid gap-1"
+          style={{
             gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
-            gap: '4px',
           }}
         >
           {photosWithUrls.photos.map((photo, idx) => {
@@ -394,25 +428,30 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
               });
             };
 
-            // 计算叠图模式下的z-index（从右到左，最右边的在最上层）
-            const totalRealPhotos = photosWithUrls.photos.filter(p => p).length;
-            const zIndex = isOverlayMode ? (totalRealPhotos - idx) : 1;
-            const opacity = isOverlayMode ? (0.3 + (idx / totalRealPhotos) * 0.7) : 1;
+            // 计算是否在叠图对比中
+            const isInOverlayPair = overlayPairIndex >= 0 && (idx === overlayPairIndex || idx === overlayPairIndex + 1);
+            const isOverlayBase = overlayPairIndex >= 0 && idx === overlayPairIndex; // 是否是对比对的基础格子
+            const shouldHide = overlayPairIndex >= 0 && idx === overlayPairIndex + 1; // 是否需要隐藏（第二张图会叠加到第一张的格子）
+
+            // 如果是对比对的第二张，则隐藏这个格子
+            if (shouldHide) {
+              return (
+                <div
+                  key={photo.id}
+                  className="relative bg-black overflow-hidden opacity-20"
+                >
+                  <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">
+                    已合并到左侧对比
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div
                 key={photo.id}
                 className="relative bg-black overflow-hidden"
-                style={isOverlayMode ? {
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  zIndex,
-                  opacity,
-                  cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
-                } : {
+                style={{
                   cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
                 }}
                 onMouseDown={handleMouseDown}
@@ -436,19 +475,59 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                 </div>
 
                 {/* 图片容器 - 可缩放和平移 */}
-                <div className="w-full h-full flex items-center justify-center">
-                  <img
-                    ref={el => imagesRef.current[idx] = el}
-                    src={photo.thumbnailUrl}
-                    alt={photo.name}
-                    className="max-w-full max-h-full object-contain"
-                    style={{
-                      transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
-                      transformOrigin: 'center center',
-                      willChange: isPanning ? 'transform' : 'auto',
-                    }}
-                    draggable={false}
-                  />
+                <div className="w-full h-full flex items-center justify-center relative">
+                  {/* 如果是对比对的基础格子，显示两张图片叠加 */}
+                  {isOverlayBase && photosWithUrls.photos[overlayPairIndex + 1] ? (
+                    <>
+                      {/* 底层图片（第一张，较暗） */}
+                      <img
+                        ref={el => imagesRef.current[idx] = el}
+                        src={photo.thumbnailUrl}
+                        alt={photo.name}
+                        className="max-w-full max-h-full object-contain absolute"
+                        style={{
+                          transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                          transformOrigin: 'center center',
+                          willChange: isPanning ? 'transform' : 'auto',
+                          opacity: 0.5,
+                          zIndex: 1,
+                        }}
+                        draggable={false}
+                      />
+                      {/* 顶层图片（第二张，半透明，从右边叠加） */}
+                      <img
+                        src={photosWithUrls.photos[overlayPairIndex + 1].thumbnailUrl}
+                        alt={photosWithUrls.photos[overlayPairIndex + 1].name}
+                        className="max-w-full max-h-full object-contain absolute"
+                        style={{
+                          transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                          transformOrigin: 'center center',
+                          willChange: isPanning ? 'transform' : 'auto',
+                          opacity: 0.6,
+                          zIndex: 2,
+                        }}
+                        draggable={false}
+                      />
+                      {/* 叠图指示器 */}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-purple-600/80 text-white px-4 py-2 rounded-lg text-sm font-bold pointer-events-none z-10">
+                        🔀 叠图对比
+                      </div>
+                    </>
+                  ) : (
+                    /* 正常显示单张图片 */
+                    <img
+                      ref={el => imagesRef.current[idx] = el}
+                      src={photo.thumbnailUrl}
+                      alt={photo.name}
+                      className="max-w-full max-h-full object-contain"
+                      style={{
+                        transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                        transformOrigin: 'center center',
+                        willChange: isPanning ? 'transform' : 'auto',
+                      }}
+                      draggable={false}
+                    />
+                  )}
                 </div>
 
                 {/* 文件名 */}
