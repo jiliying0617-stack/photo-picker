@@ -61,7 +61,7 @@ const Exporter = memo(function Exporter({ toast }) {
     console.log('总照片数:', photos.length);
     console.log('选择的分类:', selectedCategories);
 
-    // 统计每个分类的数量
+    // 统计每个分类的数量（包括详细信息）
     const categoryCount = {
       correct: 0,
       medium: 0,
@@ -81,10 +81,21 @@ const Exporter = memo(function Exporter({ toast }) {
       const cat = photo.category || 'uncategorized';
       if (categoryCount[cat] !== undefined) {
         categoryCount[cat]++;
-        categoryPhotos[cat].push(photo.id);
+        // 保存完整的照片信息用于诊断
+        categoryPhotos[cat].push({
+          id: photo.id,
+          path: photo.path,
+          name: photo.name,
+          category: photo.category
+        });
       } else {
         categoryCount.other++;
-        categoryPhotos.other.push({ id: photo.id, category: photo.category });
+        categoryPhotos.other.push({
+          id: photo.id,
+          path: photo.path,
+          name: photo.name,
+          category: photo.category
+        });
       }
     });
 
@@ -93,20 +104,58 @@ const Exporter = memo(function Exporter({ toast }) {
 
     // 检查重复 ID
     const idSet = new Set();
-    const duplicates = [];
+    const duplicateIds = [];
     photos.forEach(photo => {
       if (idSet.has(photo.id)) {
-        duplicates.push(photo.id);
+        duplicateIds.push({
+          id: photo.id,
+          path: photo.path,
+          name: photo.name
+        });
       }
       idSet.add(photo.id);
     });
-    if (duplicates.length > 0) {
-      console.error('⚠️ 发现重复的照片 ID:', duplicates);
+    if (duplicateIds.length > 0) {
+      console.error('⚠️ 发现重复的照片 ID:', duplicateIds);
+    }
+
+    // 检查重复 path
+    const pathSet = new Set();
+    const duplicatePaths = [];
+    photos.forEach(photo => {
+      if (pathSet.has(photo.path)) {
+        duplicatePaths.push({
+          path: photo.path,
+          id: photo.id,
+          name: photo.name
+        });
+      }
+      pathSet.add(photo.path);
+    });
+    if (duplicatePaths.length > 0) {
+      console.error('⚠️ 发现重复的照片路径:', duplicatePaths);
     }
 
     // 检查异常分类
     if (categoryCount.other > 0) {
       console.error('⚠️ 发现异常分类的照片:', categoryPhotos.other);
+    }
+
+    // 🆕 详细列出"正确"分类的所有照片
+    if (selectedCategories.correct && categoryPhotos.correct.length > 0) {
+      console.log('\n📋 "正确 ✓" 分类的所有照片:');
+      console.table(categoryPhotos.correct);
+    }
+
+    // 🆕 列出其他选中分类的照片
+    if (selectedCategories.medium && categoryPhotos.medium.length > 0) {
+      console.log('\n📋 "适中 ~" 分类的所有照片:');
+      console.table(categoryPhotos.medium);
+    }
+
+    if (selectedCategories.wrong && categoryPhotos.wrong.length > 0) {
+      console.log('\n📋 "错误 ✕" 分类的所有照片:');
+      console.table(categoryPhotos.wrong);
     }
 
     console.groupEnd();
