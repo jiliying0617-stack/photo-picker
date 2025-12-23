@@ -160,43 +160,51 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
         // 计算真实照片总数（过滤null）
         const realPhotos = photosWithUrls.photos.filter(p => p);
-        const totalPairs = Math.max(0, realPhotos.length - 1); // 总共有n-1对
 
-        if (totalPairs === 0) {
+        if (realPhotos.length < 2) {
           // 少于2张照片，无法对比
           setFlashMessage({
-            text: '至少需要2张照片才能叠图对比',
+            text: '至少需要2张照片才能对比',
             color: 'bg-red-600'
           });
           setTimeout(() => setFlashMessage(null), 1500);
           return;
         }
 
+        // 计算对比对：外侧向内对比
+        // 例如：4张图 -> (0,3), (1,2)
+        // 例如：5张图 -> (0,4), (1,3), (2不对比)
+        const totalPairs = Math.floor(realPhotos.length / 2);
+
         if (overlayPairIndex === -1) {
-          // 当前未开启叠图模式，开启并显示最右边的一对（倒数第2和最后1张）
-          setOverlayPairIndex(totalPairs - 1);
+          // 开启对比模式，显示第一对（第1张 vs 最后1张）
+          setOverlayPairIndex(0);
+          const leftIdx = 0;
+          const rightIdx = realPhotos.length - 1;
           setFlashMessage({
-            text: `🔀 叠图对比：第 ${realPhotos.length - 1} & ${realPhotos.length} 张`,
+            text: `🔀 左右对比：第 ${leftIdx + 1} 张 vs 第 ${rightIdx + 1} 张`,
             color: 'bg-purple-600'
           });
           setTimeout(() => setFlashMessage(null), 1500);
         } else {
-          // 已开启，切换到下一对（向左移动）
-          const nextIndex = overlayPairIndex - 1;
+          // 已开启，切换到下一对（向中间移动）
+          const nextIndex = overlayPairIndex + 1;
 
-          if (nextIndex < 0) {
-            // 已经到最左边，退出叠图模式
+          if (nextIndex >= totalPairs) {
+            // 已经到中间，退出对比模式
             setOverlayPairIndex(-1);
             setFlashMessage({
-              text: '已退出叠图对比',
+              text: '已退出对比模式',
               color: 'bg-gray-600'
             });
             setTimeout(() => setFlashMessage(null), 1500);
           } else {
             // 切换到下一对
             setOverlayPairIndex(nextIndex);
+            const leftIdx = nextIndex;
+            const rightIdx = realPhotos.length - 1 - nextIndex;
             setFlashMessage({
-              text: `🔀 叠图对比：第 ${nextIndex + 1} & ${nextIndex + 2} 张`,
+              text: `🔀 左右对比：第 ${leftIdx + 1} 张 vs 第 ${rightIdx + 1} 张`,
               color: 'bg-purple-600'
             });
             setTimeout(() => setFlashMessage(null), 1500);
@@ -307,14 +315,19 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
             </span>
           )}
           <span className="text-blue-400">缩放: {(scale * 100).toFixed(0)}%</span>
-          {overlayPairIndex >= 0 && (
-            <span className="text-purple-400 font-bold animate-pulse">
-              🔀 叠图对比：第 {overlayPairIndex + 1} & {overlayPairIndex + 2} 张
-            </span>
-          )}
+          {overlayPairIndex >= 0 && (() => {
+            const realPhotos = photosWithUrls.photos.filter(p => p);
+            const leftIdx = overlayPairIndex;
+            const rightIdx = realPhotos.length - 1 - overlayPairIndex;
+            return (
+              <span className="text-purple-400 font-bold animate-pulse">
+                🔀 左右对比：第 {leftIdx + 1} 张 vs 第 {rightIdx + 1} 张
+              </span>
+            );
+          })()}
           <span className="text-gray-400 text-xs">
             {allPhotos && totalGroups > 1 ? '↑↓切换组 · ' : ''}
-            Q叠图对比(从右到左) · 滚轮缩放 · 拖拽平移 · R键重置
+            Q左右对比 · 滚轮缩放 · 拖拽平移 · R键重置
           </span>
         </div>
 
@@ -428,20 +441,23 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
               });
             };
 
-            // 计算是否在叠图对比中
-            const isInOverlayPair = overlayPairIndex >= 0 && (idx === overlayPairIndex || idx === overlayPairIndex + 1);
-            const isOverlayBase = overlayPairIndex >= 0 && idx === overlayPairIndex; // 是否是对比对的基础格子
-            const shouldHide = overlayPairIndex >= 0 && idx === overlayPairIndex + 1; // 是否需要隐藏（第二张图会叠加到第一张的格子）
+            // 计算是否在对比模式中
+            const realPhotos = photosWithUrls.photos.filter(p => p);
+            const leftCompareIdx = overlayPairIndex;
+            const rightCompareIdx = realPhotos.length - 1 - overlayPairIndex;
+            const isLeftCompare = overlayPairIndex >= 0 && idx === leftCompareIdx; // 是否是左侧对比格子
+            const isRightCompare = overlayPairIndex >= 0 && idx === rightCompareIdx; // 是否是右侧对比格子
 
-            // 如果是对比对的第二张，则隐藏这个格子
-            if (shouldHide) {
+            // 如果是右侧对比格子，显示提示
+            if (isRightCompare) {
               return (
                 <div
                   key={photo.id}
                   className="relative bg-black overflow-hidden opacity-20"
                 >
-                  <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">
-                    已合并到左侧对比
+                  <div className="w-full h-full flex items-center justify-center flex-col gap-2 text-gray-500 text-sm">
+                    <div className="text-4xl">➡️</div>
+                    <div>已移至第 {leftCompareIdx + 1} 格左右对比</div>
                   </div>
                 </div>
               );
@@ -476,43 +492,53 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
                 {/* 图片容器 - 可缩放和平移 */}
                 <div className="w-full h-full flex items-center justify-center relative">
-                  {/* 如果是对比对的基础格子，显示两张图片叠加 */}
-                  {isOverlayBase && photosWithUrls.photos[overlayPairIndex + 1] ? (
-                    <>
-                      {/* 底层图片（第一张，较暗） */}
-                      <img
-                        ref={el => imagesRef.current[idx] = el}
-                        src={photo.thumbnailUrl}
-                        alt={photo.name}
-                        className="max-w-full max-h-full object-contain absolute"
-                        style={{
-                          transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
-                          transformOrigin: 'center center',
-                          willChange: isPanning ? 'transform' : 'auto',
-                          opacity: 0.5,
-                          zIndex: 1,
-                        }}
-                        draggable={false}
-                      />
-                      {/* 顶层图片（第二张，半透明，从右边叠加） */}
-                      <img
-                        src={photosWithUrls.photos[overlayPairIndex + 1].thumbnailUrl}
-                        alt={photosWithUrls.photos[overlayPairIndex + 1].name}
-                        className="max-w-full max-h-full object-contain absolute"
-                        style={{
-                          transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
-                          transformOrigin: 'center center',
-                          willChange: isPanning ? 'transform' : 'auto',
-                          opacity: 0.6,
-                          zIndex: 2,
-                        }}
-                        draggable={false}
-                      />
-                      {/* 叠图指示器 */}
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-purple-600/80 text-white px-4 py-2 rounded-lg text-sm font-bold pointer-events-none z-10">
-                        🔀 叠图对比
+                  {/* 如果是左侧对比格子，显示左右分屏对比 */}
+                  {isLeftCompare && photosWithUrls.photos[rightCompareIdx] ? (
+                    <div className="w-full h-full flex">
+                      {/* 左半边：当前图片 */}
+                      <div className="w-1/2 h-full flex items-center justify-center border-r-2 border-purple-500 relative">
+                        <img
+                          ref={el => imagesRef.current[idx] = el}
+                          src={photo.thumbnailUrl}
+                          alt={photo.name}
+                          className="max-w-full max-h-full object-contain"
+                          style={{
+                            transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                            transformOrigin: 'center center',
+                            willChange: isPanning ? 'transform' : 'auto',
+                          }}
+                          draggable={false}
+                        />
+                        {/* 左侧标签 */}
+                        <div className="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
+                          左：第 {leftCompareIdx + 1} 张
+                        </div>
                       </div>
-                    </>
+
+                      {/* 右半边：对比图片 */}
+                      <div className="w-1/2 h-full flex items-center justify-center relative">
+                        <img
+                          src={photosWithUrls.photos[rightCompareIdx].thumbnailUrl}
+                          alt={photosWithUrls.photos[rightCompareIdx].name}
+                          className="max-w-full max-h-full object-contain"
+                          style={{
+                            transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                            transformOrigin: 'center center',
+                            willChange: isPanning ? 'transform' : 'auto',
+                          }}
+                          draggable={false}
+                        />
+                        {/* 右侧标签 */}
+                        <div className="absolute top-2 right-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-bold">
+                          右：第 {rightCompareIdx + 1} 张
+                        </div>
+                      </div>
+
+                      {/* 中央分隔指示器 */}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-purple-600 text-white px-3 py-1.5 rounded-full text-xs font-bold pointer-events-none shadow-lg z-10">
+                        VS
+                      </div>
+                    </div>
                   ) : (
                     /* 正常显示单张图片 */
                     <img
@@ -543,7 +569,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       {/* 底部提示栏 - 固定高度 */}
       <div className="h-10 bg-black/80 flex items-center justify-center gap-8 px-6 text-xs text-gray-400 flex-shrink-0">
         <span>← → 切换</span>
-        <span className="text-purple-400">Q 叠图对比</span>
+        <span className="text-purple-400">Q 左右对比</span>
         <span>滚轮 缩放</span>
         <span>拖拽 平移</span>
         <span>R 重置</span>
