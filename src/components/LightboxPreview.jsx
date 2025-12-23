@@ -156,7 +156,23 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         setScale(1);
         setPan({ x: 0, y: 0 });
       } else if (e.key === 'q' || e.key === 'Q') {
+        // Q键按下时已在keydown单独处理，这里不做处理
         e.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, photosWithUrls.photos]);
+
+  // Q键按住/松开对比功能
+  useEffect(() => {
+    let isQPressed = false;
+
+    const handleQKeyDown = (e) => {
+      if ((e.key === 'q' || e.key === 'Q') && !isQPressed) {
+        e.preventDefault();
+        isQPressed = true;
 
         // 计算真实照片总数（过滤null）
         const realPhotos = photosWithUrls.photos.filter(p => p);
@@ -171,51 +187,36 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
           return;
         }
 
-        // 计算对比对：外侧向内对比
-        // 例如：4张图 -> (0,3), (1,2)
-        // 例如：5张图 -> (0,4), (1,3), (2不对比)
-        const totalPairs = Math.floor(realPhotos.length / 2);
-
-        if (overlayPairIndex === -1) {
-          // 开启对比模式，显示第一对（第1张 vs 最后1张）
-          setOverlayPairIndex(0);
-          const leftIdx = 0;
-          const rightIdx = realPhotos.length - 1;
-          setFlashMessage({
-            text: `🔀 左右对比：第 ${leftIdx + 1} 张 vs 第 ${rightIdx + 1} 张`,
-            color: 'bg-purple-600'
-          });
-          setTimeout(() => setFlashMessage(null), 1500);
-        } else {
-          // 已开启，切换到下一对（向中间移动）
-          const nextIndex = overlayPairIndex + 1;
-
-          if (nextIndex >= totalPairs) {
-            // 已经到中间，退出对比模式
-            setOverlayPairIndex(-1);
-            setFlashMessage({
-              text: '已退出对比模式',
-              color: 'bg-gray-600'
-            });
-            setTimeout(() => setFlashMessage(null), 1500);
-          } else {
-            // 切换到下一对
-            setOverlayPairIndex(nextIndex);
-            const leftIdx = nextIndex;
-            const rightIdx = realPhotos.length - 1 - nextIndex;
-            setFlashMessage({
-              text: `🔀 左右对比：第 ${leftIdx + 1} 张 vs 第 ${rightIdx + 1} 张`,
-              color: 'bg-purple-600'
-            });
-            setTimeout(() => setFlashMessage(null), 1500);
-          }
-        }
+        // 按下Q键，开启对比模式（第1张 vs 最后1张）
+        setOverlayPairIndex(0);
+        const leftIdx = 0;
+        const rightIdx = realPhotos.length - 1;
+        setFlashMessage({
+          text: `🔀 按住Q对比：第 ${leftIdx + 1} 张 vs 第 ${rightIdx + 1} 张`,
+          color: 'bg-purple-600'
+        });
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, overlayPairIndex, photosWithUrls.photos]);
+    const handleQKeyUp = (e) => {
+      if (e.key === 'q' || e.key === 'Q') {
+        e.preventDefault();
+        isQPressed = false;
+
+        // 松开Q键，退出对比模式
+        setOverlayPairIndex(-1);
+        setFlashMessage(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleQKeyDown);
+    window.addEventListener('keyup', handleQKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleQKeyDown);
+      window.removeEventListener('keyup', handleQKeyUp);
+    };
+  }, [photosWithUrls.photos]);
 
   // 鼠标滚轮缩放
   useEffect(() => {
@@ -327,7 +328,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
           })()}
           <span className="text-gray-400 text-xs">
             {allPhotos && totalGroups > 1 ? '↑↓切换组 · ' : ''}
-            Q左右对比 · 滚轮缩放 · 拖拽平移 · R键重置
+            按住Q左右对比 · 滚轮缩放 · 拖拽平移 · R键重置
           </span>
         </div>
 
@@ -569,7 +570,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       {/* 底部提示栏 - 固定高度 */}
       <div className="h-10 bg-black/80 flex items-center justify-center gap-8 px-6 text-xs text-gray-400 flex-shrink-0">
         <span>← → 切换</span>
-        <span className="text-purple-400">Q 左右对比</span>
+        <span className="text-purple-400">按住Q 左右对比</span>
         <span>滚轮 缩放</span>
         <span>拖拽 平移</span>
         <span>R 重置</span>
