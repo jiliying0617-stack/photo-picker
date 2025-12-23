@@ -195,12 +195,9 @@ const Exporter = memo(function Exporter({ toast }) {
               <h2 className="text-2xl font-bold text-gray-800 mb-2">选择导出分类</h2>
               <p className="text-sm text-gray-500">保持原文件夹结构导出</p>
               {stats.total > exportableStats.total && (
-                <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                  <p className="text-xs text-orange-700">
-                    ⚠️ 检测到 {stats.total - exportableStats.total} 张图片缺少文件对象，将无法导出
-                  </p>
-                  <p className="text-xs text-orange-600 mt-1">
-                    建议：重新导入文件夹后再导出
+                <div className="mt-3 p-2 neu-concave rounded-lg">
+                  <p className="text-xs text-gray-600">
+                    ⚠️ {stats.total - exportableStats.total} 张图片缺少文件，将跳过
                   </p>
                 </div>
               )}
