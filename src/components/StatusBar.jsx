@@ -141,7 +141,7 @@ const StatusBar = memo(function StatusBar({ isCompareMode = false, enableGroupNa
               <span>切换</span>
               <span className="text-gray-400 ml-2">(Shift/Ctrl多选)</span>
               <span className="text-gray-400">·</span>
-              <span className="text-gray-500 text-[10px]">v1.0.0</span>
+              <span className="text-gray-500 text-[10px]">v1.2.0</span>
             </>
           )}
         </div>

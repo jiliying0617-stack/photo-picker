@@ -13,6 +13,30 @@ const FileImporter = memo(function FileImporter({ toast }) {
       return;
     }
 
+    // 🔍 检查是否有旧的分类标记
+    const categories = usePhotoStore.getState().categories;
+    const hasOldCategories = Object.keys(categories).length > 0;
+
+    if (hasOldCategories) {
+      const shouldClear = confirm(
+        `⚠️ 检测到之前的分类标记 (${Object.keys(categories).length} 张照片)\n\n` +
+        `重要提示: 照片分类是基于文件路径保存的。\n` +
+        `如果导入的新文件夹中有同名文件，可能会被错误地应用旧分类。\n\n` +
+        `建议:\n` +
+        `· 如果这是全新的文件夹 → 点击"确定"清空旧分类\n` +
+        `· 如果是同一批照片 → 点击"取消"保留分类\n\n` +
+        `是否清空之前的分类标记？`
+      );
+
+      if (shouldClear) {
+        usePhotoStore.getState().clearCategories();
+        console.log('[导入] 已清空旧的分类标记');
+        toast.info('已清空旧的分类标记');
+      } else {
+        console.log('[导入] 保留旧的分类标记（可能导致同名文件被错误标记）');
+      }
+    }
+
     setImporting(true);
     setProgress({ current: 0, total: 0 });
 
@@ -53,6 +77,30 @@ const FileImporter = memo(function FileImporter({ toast }) {
     const handleDropFolder = async (e) => {
       const dataTransfer = e.detail;
       if (!dataTransfer || !dataTransfer.items) return;
+
+      // 🔍 检查是否有旧的分类标记
+      const categories = usePhotoStore.getState().categories;
+      const hasOldCategories = Object.keys(categories).length > 0;
+
+      if (hasOldCategories) {
+        const shouldClear = confirm(
+          `⚠️ 检测到之前的分类标记 (${Object.keys(categories).length} 张照片)\n\n` +
+          `重要提示: 照片分类是基于文件路径保存的。\n` +
+          `如果导入的新文件夹中有同名文件，可能会被错误地应用旧分类。\n\n` +
+          `建议:\n` +
+          `· 如果这是全新的文件夹 → 点击"确定"清空旧分类\n` +
+          `· 如果是同一批照片 → 点击"取消"保留分类\n\n` +
+          `是否清空之前的分类标记？`
+        );
+
+        if (shouldClear) {
+          usePhotoStore.getState().clearCategories();
+          console.log('[拖放导入] 已清空旧的分类标记');
+          toast.info('已清空旧的分类标记');
+        } else {
+          console.log('[拖放导入] 保留旧的分类标记（可能导致同名文件被错误标记）');
+        }
+      }
 
       setImporting(true);
       setProgress({ current: 0, total: 0 });

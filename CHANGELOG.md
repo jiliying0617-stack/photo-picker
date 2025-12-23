@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2025-12-23
+
+### 🎉 重要更新
+
+本版本修复了**严重的数据一致性问题**和**错误打标 bug**，强烈建议所有用户升级。
+
+### 🐛 关键 Bug 修复 (Critical)
+
+- **修复错误打标问题** (#critical)
+  - 问题：不同文件夹中的同名文件会错误地共享分类标记
+  - 原因：旧版本使用相对路径（`photo.path`）作为分类标记的 key
+  - 修复：现在使用 `路径 + 文件大小 + 修改时间` 作为唯一标识符
+  - 影响：导入新文件夹时，同名照片不再被错误标记
+
+- **修复数量不匹配问题** (#critical)
+  - 问题：StatusBar 显示 9 张，导出对话框显示 15 张
+  - 原因：重复照片、无效分类值、数据不一致
+  - 修复：
+    - 添加重复照片检测和自动去重（基于 path）
+    - 添加无效分类值验证和自动清理
+    - 添加导出诊断日志（检查数据完整性）
+
+### ✨ 新增功能 (Features)
+
+- **导入时智能提示**
+  - 检测到旧的分类标记时弹出警告
+  - 用户可选择清空或保留旧分类
+  - 防止同名文件错误标记
+
+- **数据完整性检查**
+  - 启动时验证 localStorage 中的分类数据
+  - 自动清理无效的分类值
+  - 导入时自动去除重复照片
+
+- **导出诊断功能**
+  - 导出时在控制台显示详细诊断信息
+  - 检查重复 ID、异常分类、实际统计
+  - 帮助快速定位数据问题
+
+### 🔒 安全改进 (Security)
+
+- **分类值验证**
+  - `setCategory` 和 `setCategoryBatch` 现在验证输入值
+  - 拒绝设置无效的分类值（只允许 correct/medium/wrong/null）
+  - 防止数据损坏
+
+### 📚 文档 (Documentation)
+
+- 更新 README 添加已知问题说明
+- 添加数据迁移指南（v1.1.x → v1.2.0）
+
+### ⚠️ 破坏性变更 (Breaking Changes)
+
+- **分类标记存储格式变更**
+  - 旧格式：`{ "path/to/photo.jpg": "correct" }`
+  - 新格式：`{ "path/to/photo.jpg|12345|1234567890": "correct" }`
+  - **迁移方式：首次导入时选择"清空旧分类"**
+
+### 🔧 技术细节
+
+**修改的文件：**
+```
+modified:   package.json (1.1.0 → 1.2.0)
+modified:   src/store/usePhotoStore.js
+modified:   src/components/Exporter.jsx
+modified:   src/components/FileImporter.jsx
+```
+
+**代码统计：**
+- 新增函数：`getPhotoKey()`, `isValidCategory()`
+- 新增诊断日志：约 60 行
+- 改进数据验证：约 40 行
+- 总计：约 100 行新代码
+
+---
+
 ## [1.1.0] - 2025-12-23
 
 ### 🎉 重要更新

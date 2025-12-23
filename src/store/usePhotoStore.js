@@ -15,12 +15,40 @@ function loadColumns() {
   }
 }
 
+// 验证分类值是否有效
+function isValidCategory(category) {
+  const validCategories = ['correct', 'medium', 'wrong', null, undefined];
+  return validCategories.includes(category);
+}
+
 // 从 localStorage 加载分类标记
 function loadCategories() {
   try {
     const categoriesKey = getUserStorageKey('categories');
     const savedCategories = localStorage.getItem(categoriesKey);
-    return savedCategories ? JSON.parse(savedCategories) : {};
+    if (!savedCategories) return {};
+
+    const categories = JSON.parse(savedCategories);
+
+    // 🔍 诊断：验证并清理无效的分类值
+    const invalidEntries = [];
+    const cleanedCategories = {};
+
+    Object.entries(categories).forEach(([path, category]) => {
+      if (isValidCategory(category)) {
+        cleanedCategories[path] = category;
+      } else {
+        invalidEntries.push({ path, category });
+      }
+    });
+
+    if (invalidEntries.length > 0) {
+      devError(`⚠️ 发现并移除了 ${invalidEntries.length} 个无效的分类标记:`, invalidEntries.slice(0, 5));
+      // 保存清理后的数据
+      localStorage.setItem(categoriesKey, JSON.stringify(cleanedCategories));
+    }
+
+    return cleanedCategories;
   } catch (error) {
     devError('加载分类标记失败:', error);
     return {};
@@ -44,6 +72,13 @@ function getFolderPath(photoPath) {
   const parts = photoPath.split('/');
   parts.pop(); // 移除文件名
   return parts.join('/');
+}
+
+// 生成照片的唯一标识符（用于分类标记）
+// 使用 path + size + lastModified 来唯一标识一张照片
+// 这样可以避免不同文件夹中的同名文件共享分类
+function getPhotoKey(photo) {
+  return `${photo.path}|${photo.size}|${photo.lastModified}`;
 }
 
 // 构建文件夹映射表 (使用预计算的 photo.folder)
@@ -70,28 +105,53 @@ const usePhotoStore = create((set, get) => ({
 
   // Actions
   setPhotos: (photos) => {
+    // 🔍 诊断：检查并去除重复照片（基于 path）
+    const seenPaths = new Map();
+    const uniquePhotos = [];
+    const duplicatePaths = [];
+
+    photos.forEach(photo => {
+      if (seenPaths.has(photo.path)) {
+        duplicatePaths.push(photo.path);
+        // 保留第一次出现的照片，跳过重复的
+        return;
+      }
+      seenPaths.set(photo.path, true);
+      uniquePhotos.push(photo);
+    });
+
+    if (duplicatePaths.length > 0) {
+      devError(`⚠️ 发现并移除了 ${duplicatePaths.length} 张重复照片:`, duplicatePaths.slice(0, 5));
+    }
+
     // 恢复之前的分类标记并预计算文件夹路径（性能优化）
     const categories = get().categories;
-    const photosWithCategories = photos.map(photo => ({
-      ...photo,
-      category: categories[photo.path] || photo.category || null,
-      folder: getFolderPath(photo.path), // 预计算文件夹路径，避免重复 split/join
-    }));
+    const photosWithCategories = uniquePhotos.map(photo => {
+      const photoKey = getPhotoKey(photo);
+      return {
+        ...photo,
+        category: categories[photoKey] || photo.category || null,
+        folder: getFolderPath(photo.path), // 预计算文件夹路径，避免重复 split/join
+      };
+    });
 
     // 构建文件夹映射
     const folderMap = buildFolderMap(photosWithCategories);
 
     set({ photos: photosWithCategories, folderMap });
-    devLog(`✓ 加载了 ${photos.length} 张图片,恢复了 ${Object.keys(categories).length} 个分类标记`);
+    devLog(`✓ 加载了 ${uniquePhotos.length} 张图片（原始: ${photos.length}）,恢复了 ${Object.keys(categories).length} 个分类标记`);
   },
 
   addPhotos: (newPhotos) => {
     const categories = get().categories;
-    const photosWithCategories = newPhotos.map(photo => ({
-      ...photo,
-      category: categories[photo.path] || photo.category || null,
-      folder: getFolderPath(photo.path), // 预计算文件夹路径
-    }));
+    const photosWithCategories = newPhotos.map(photo => {
+      const photoKey = getPhotoKey(photo);
+      return {
+        ...photo,
+        category: categories[photoKey] || photo.category || null,
+        folder: getFolderPath(photo.path), // 预计算文件夹路径
+      };
+    });
     const updatedPhotos = [...get().photos, ...photosWithCategories];
 
     // 重建文件夹映射
@@ -101,6 +161,12 @@ const usePhotoStore = create((set, get) => ({
   },
 
   setCategory: (photoId, category) => {
+    // 🔍 验证分类值
+    if (category && !isValidCategory(category)) {
+      devError(`⚠️ 无效的分类值: ${category}，已忽略`);
+      return;
+    }
+
     const photos = get().photos;
     const folderMap = get().folderMap;
     const photo = photos.find(p => p.id === photoId);
@@ -125,12 +191,13 @@ const usePhotoStore = create((set, get) => ({
 
     set({ photos: updatedPhotos, folderMap: newFolderMap });
 
-    // 更新分类标记映射
+    // 更新分类标记映射（使用唯一 key）
     const categories = { ...get().categories };
+    const photoKey = getPhotoKey(photo);
     if (category) {
-      categories[photo.path] = category;
+      categories[photoKey] = category;
     } else {
-      delete categories[photo.path];
+      delete categories[photoKey];
     }
     set({ categories });
 
@@ -142,6 +209,12 @@ const usePhotoStore = create((set, get) => ({
   setCategoryBatch: (photoIds, category) => {
     if (!photoIds || photoIds.length === 0) return;
 
+    // 🔍 验证分类值
+    if (category && !isValidCategory(category)) {
+      devError(`⚠️ 无效的分类值: ${category}，已忽略`);
+      return;
+    }
+
     const photoIdSet = new Set(photoIds); // O(1) 查找
     const photos = get().photos;
     const folderMap = get().folderMap;
@@ -150,11 +223,12 @@ const usePhotoStore = create((set, get) => ({
     // 单次遍历更新所有图片 - O(n)
     const updatedPhotos = photos.map(p => {
       if (photoIdSet.has(p.id)) {
-        // 更新分类标记映射
+        // 更新分类标记映射（使用唯一 key）
+        const photoKey = getPhotoKey(p);
         if (category) {
-          categories[p.path] = category;
+          categories[photoKey] = category;
         } else {
-          delete categories[p.path];
+          delete categories[photoKey];
         }
         return { ...p, category };
       }

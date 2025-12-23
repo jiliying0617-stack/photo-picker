@@ -56,6 +56,61 @@ const Exporter = memo(function Exporter({ toast }) {
       }
     });
 
+    // 🔍 诊断：检查数据一致性
+    console.group('📊 导出诊断信息');
+    console.log('总照片数:', photos.length);
+    console.log('选择的分类:', selectedCategories);
+
+    // 统计每个分类的数量
+    const categoryCount = {
+      correct: 0,
+      medium: 0,
+      wrong: 0,
+      uncategorized: 0,
+      other: 0  // 异常分类
+    };
+    const categoryPhotos = {
+      correct: [],
+      medium: [],
+      wrong: [],
+      uncategorized: [],
+      other: []
+    };
+
+    photos.forEach(photo => {
+      const cat = photo.category || 'uncategorized';
+      if (categoryCount[cat] !== undefined) {
+        categoryCount[cat]++;
+        categoryPhotos[cat].push(photo.id);
+      } else {
+        categoryCount.other++;
+        categoryPhotos.other.push({ id: photo.id, category: photo.category });
+      }
+    });
+
+    console.log('实际分类统计:', categoryCount);
+    console.log('待导出照片数:', photosToExport.length);
+
+    // 检查重复 ID
+    const idSet = new Set();
+    const duplicates = [];
+    photos.forEach(photo => {
+      if (idSet.has(photo.id)) {
+        duplicates.push(photo.id);
+      }
+      idSet.add(photo.id);
+    });
+    if (duplicates.length > 0) {
+      console.error('⚠️ 发现重复的照片 ID:', duplicates);
+    }
+
+    // 检查异常分类
+    if (categoryCount.other > 0) {
+      console.error('⚠️ 发现异常分类的照片:', categoryPhotos.other);
+    }
+
+    console.groupEnd();
+
     if (photosToExport.length === 0) {
       toast.warning('请至少选择一个分类进行导出!');
       return;
