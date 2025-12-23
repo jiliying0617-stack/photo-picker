@@ -268,10 +268,30 @@ const usePhotoStore = create((set, get) => ({
   },
 
   clearCategories: () => {
-    set({ categories: {} });
+    const photos = get().photos;
+    const folderMap = get().folderMap;
+
+    // 清空所有照片的分类字段
+    const clearedPhotos = photos.map(p => ({ ...p, category: null }));
+
+    // 更新 folderMap 中的照片分类
+    const newFolderMap = {};
+    Object.keys(folderMap).forEach(folder => {
+      newFolderMap[folder] = folderMap[folder].map(p => ({ ...p, category: null }));
+    });
+
+    // 清空 categories 映射
+    set({
+      photos: clearedPhotos,
+      folderMap: newFolderMap,
+      categories: {}
+    });
+
+    // 清空 localStorage
     const categoriesKey = getUserStorageKey('categories');
     localStorage.removeItem(categoriesKey);
-    devLog('✓ 清空所有分类标记');
+
+    devLog(`✓ 清空所有分类标记 (${photos.length} 张照片)`);
   },
 
   // Computed
