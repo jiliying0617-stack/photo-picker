@@ -1,0 +1,13 @@
+{
+  "build": {
+    "command": "npm run build",
+    "outputDirectory": "dist",
+    "rootDirectory": ".",
+    "env": {
+      "NODE_VERSION": "18"
+    }
+  },
+  "deploy": {
+    "framework": "vite"
+  }
+}
