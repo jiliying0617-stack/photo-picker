@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2025-12-23
+
+### 🎉 重要更新
+
+本版本从 **Linux 用户视角**优化了键盘快捷键系统，大幅提升了照片标记工作流的效率。
+
+### ✨ 新增功能 (Features)
+
+- **范围选择 (Shift+Arrow)** (#linux-workflow)
+  - `Shift + →` - 扩展选择到下一张照片
+  - `Shift + ←` - 扩展选择到上一张照片
+  - 类似 Linux 终端和文本编辑器的行为
+  - 可连续扩展选择多张照片，然后批量打标
+
+- **全选快捷键 (Ctrl+A)** (#productivity)
+  - `Ctrl+A` (Windows/Linux) 或 `Cmd+A` (macOS) - 选择所有可见照片
+  - 符合通用操作系统快捷键习惯
+  - 选中后可批量打标签
+
+- **快速跳转 (Home/End)** (#navigation)
+  - `Home` - 跳转到第一张照片
+  - `End` - 跳转到最后一张照片
+  - 大幅提升大量照片浏览效率
+
+- **增强清除快捷键** (#usability)
+  - 新增 `Delete` 和 `Backspace` 用于清除标签
+  - 原有的 `0`/`x`/`X` 继续保留
+  - 更符合用户直觉
+
+### ⚡ 性能优化 (Performance)
+
+- 优化键盘事件处理逻辑
+- Shift 修饰键检测优先于普通导航
+- 所有回调函数使用 `useCallback` 优化
+
+### 🔧 技术细节
+
+**修改的文件：**
+```
+modified:   package.json (1.2.0 → 1.3.0)
+modified:   src/constants/index.js
+modified:   src/hooks/useKeyboardShortcuts.js
+modified:   src/App.jsx
+modified:   CHANGELOG.md
+```
+
+**新增功能清单：**
+- 新增函数：`moveToFirst()`, `moveToLast()`, `extendSelectionNext()`, `extendSelectionPrev()`, `selectAll()`
+- 新增快捷键：Home, End, Shift+Arrow, Ctrl+A, Delete, Backspace
+- 总计：约 80 行新代码
+
+**键盘快捷键完整列表：**
+| 功能 | 快捷键 |
+|------|--------|
+| 标记为正确 | `1` |
+| 标记为适中 | `2` |
+| 标记为错误 | `3` |
+| 清除标签 | `0` / `x` / `X` / `Delete` / `Backspace` |
+| 下一张 | `→` |
+| 上一张 | `←` |
+| 第一张 | `Home` |
+| 最后一张 | `End` |
+| 扩展选择（下一张） | `Shift + →` |
+| 扩展选择（上一张） | `Shift + ←` |
+| 全选 | `Ctrl+A` (Windows/Linux) 或 `Cmd+A` (macOS) |
+
+---
+
 ## [1.2.0] - 2025-12-23
 
 ### 🎉 重要更新

@@ -13,6 +13,8 @@ export function useKeyboardShortcuts({
   setCategoryBatch,
   setSelectedPhotoId,
   clearSelection,
+  togglePhotoSelection,  // 🆕 添加用于范围选择
+  setSelectedPhotos,      // 🆕 添加用于全选
 }) {
   // 导航到下一张
   const moveToNext = useCallback(() => {
@@ -31,6 +33,47 @@ export function useKeyboardShortcuts({
       setSelectedPhotoId(filteredPhotos[idx - 1].id);
     }
   }, [selectedPhotoId, filteredPhotos, setSelectedPhotoId]);
+
+  // 🆕 跳到第一张
+  const moveToFirst = useCallback(() => {
+    if (filteredPhotos.length === 0) return;
+    setSelectedPhotoId(filteredPhotos[0].id);
+  }, [filteredPhotos, setSelectedPhotoId]);
+
+  // 🆕 跳到最后一张
+  const moveToLast = useCallback(() => {
+    if (filteredPhotos.length === 0) return;
+    setSelectedPhotoId(filteredPhotos[filteredPhotos.length - 1].id);
+  }, [filteredPhotos, setSelectedPhotoId]);
+
+  // 🆕 范围选择：扩展选择到下一张
+  const extendSelectionNext = useCallback(() => {
+    if (!selectedPhotoId || filteredPhotos.length === 0) return;
+    const idx = filteredPhotos.findIndex((p) => p.id === selectedPhotoId);
+    if (idx < filteredPhotos.length - 1) {
+      const nextPhoto = filteredPhotos[idx + 1];
+      togglePhotoSelection(nextPhoto.id);
+      setSelectedPhotoId(nextPhoto.id);
+    }
+  }, [selectedPhotoId, filteredPhotos, togglePhotoSelection, setSelectedPhotoId]);
+
+  // 🆕 范围选择：扩展选择到上一张
+  const extendSelectionPrev = useCallback(() => {
+    if (!selectedPhotoId || filteredPhotos.length === 0) return;
+    const idx = filteredPhotos.findIndex((p) => p.id === selectedPhotoId);
+    if (idx > 0) {
+      const prevPhoto = filteredPhotos[idx - 1];
+      togglePhotoSelection(prevPhoto.id);
+      setSelectedPhotoId(prevPhoto.id);
+    }
+  }, [selectedPhotoId, filteredPhotos, togglePhotoSelection, setSelectedPhotoId]);
+
+  // 🆕 全选所有可见照片
+  const selectAll = useCallback(() => {
+    if (filteredPhotos.length === 0) return;
+    const allPhotoIds = filteredPhotos.map(p => p.id);
+    setSelectedPhotos(allPhotoIds);
+  }, [filteredPhotos, setSelectedPhotos]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -87,10 +130,27 @@ export function useKeyboardShortcuts({
         batchSetCategory(null);
       } else if (e.key === KEYBOARD_SHORTCUTS.PREV) {
         e.preventDefault();
-        moveToPrev();
+        if (e.shiftKey) {
+          extendSelectionPrev();
+        } else {
+          moveToPrev();
+        }
       } else if (e.key === KEYBOARD_SHORTCUTS.NEXT) {
         e.preventDefault();
-        moveToNext();
+        if (e.shiftKey) {
+          extendSelectionNext();
+        } else {
+          moveToNext();
+        }
+      } else if (e.key === KEYBOARD_SHORTCUTS.FIRST) {
+        e.preventDefault();
+        moveToFirst();
+      } else if (e.key === KEYBOARD_SHORTCUTS.LAST) {
+        e.preventDefault();
+        moveToLast();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        selectAll();
       }
     };
 
@@ -106,5 +166,10 @@ export function useKeyboardShortcuts({
     clearSelection,
     moveToNext,
     moveToPrev,
+    moveToFirst,
+    moveToLast,
+    extendSelectionNext,
+    extendSelectionPrev,
+    selectAll,
   ]);
 }

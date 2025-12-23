@@ -21,12 +21,21 @@ export const COMPARE_MODE = {
 
 // 键盘快捷键
 export const KEYBOARD_SHORTCUTS = {
+  // 分类标记
   CORRECT: '1',
   MEDIUM: '2',
   WRONG: '3',
-  CLEAR: ['0', 'x', 'X'],
+  CLEAR: ['0', 'x', 'X', 'Delete', 'Backspace'],  // 🆕 添加 Delete/Backspace
+
+  // 导航
   PREV: 'ArrowLeft',
   NEXT: 'ArrowRight',
+  FIRST: 'Home',           // 🆕 跳到第一张
+  LAST: 'End',             // 🆕 跳到最后一张
+
+  // 选择（需要配合 Shift/Ctrl 键）
+  // Shift+ArrowLeft/Right - 范围选择
+  // Ctrl+A - 全选
 };
 
 // 分类类型

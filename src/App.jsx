@@ -41,7 +41,7 @@ function App() {
 
   // 自定义 Hooks
   const { filteredPhotos } = usePhotoDisplay(photos, filter);
-  const { selectedPhotos, setSelectedPhotos, clearSelection } = usePhotoSelection();
+  const { selectedPhotos, setSelectedPhotos, togglePhotoSelection, clearSelection } = usePhotoSelection();
   const { setPhotoRef, scrollToPhoto } = usePhotoRefs();
   const { isCompareMode, compareColumns, displayPhotos } = useCompareMode(
     selectedFolders,
@@ -75,6 +75,8 @@ function App() {
     setCategoryBatch,
     setSelectedPhotoId,
     clearSelection,
+    togglePhotoSelection,
+    setSelectedPhotos,
   });
 
   // 计算总组数 - 在对比模式或检索组模式下启用
