@@ -10,6 +10,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   const [isCompareMode, setIsCompareMode] = useState(false); // 相邻对比模式：true表示开启全图相邻对比
   const [lastViewedPhotoId, setLastViewedPhotoId] = useState(null); // 追踪最后查看的照片ID
   const setCategory = usePhotoStore((state) => state.setCategory);
+  const setCategoryBatch = usePhotoStore((state) => state.setCategoryBatch); // 🔥 使用批量 API
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
 
   // 延迟创建所有照片的缩略图 URL (只在 Lightbox 打开时创建)
@@ -110,12 +111,17 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     }
   }, [contextMenu]);
 
-  // 批量设置分类
+  // 批量设置分类（🔥 Linus 风格：一次性批量操作）
   const handleCategoryAll = useCallback((category) => {
-    photos.forEach(photo => {
-      setCategory(photo.id, category);
-    });
-  }, [photos, setCategory]);
+    // 过滤掉 null（占位符），只获取真实照片的 ID
+    const photoIds = photos
+      .filter(p => p && p.id)
+      .map(p => p.id);
+
+    if (photoIds.length > 0) {
+      setCategoryBatch(photoIds, category); // 🔥 批量设置，只触发一次同步
+    }
+  }, [photos, setCategoryBatch]);
 
   // 键盘快捷键
   useEffect(() => {
