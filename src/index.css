@@ -38,6 +38,9 @@ textarea,
 /* 禁用双击缩放（移动端） */
 * {
   touch-action: manipulation;
+  /* 🔥 禁用浏览器默认的点击高亮（移除荧光黄） */
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
 }
 
 /* 禁用长按菜单 */
