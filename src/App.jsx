@@ -77,6 +77,7 @@ function App() {
     clearSelection,
     togglePhotoSelection,
     setSelectedPhotos,
+    previewPhotos, // 🔥 传递 previewPhotos，Lightbox 打开时禁用全局处理器
   });
 
   // 计算总组数 - 在对比模式或检索组模式下启用

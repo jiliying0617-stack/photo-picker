@@ -15,6 +15,7 @@ export function useKeyboardShortcuts({
   clearSelection,
   togglePhotoSelection,
   setSelectedPhotos,
+  previewPhotos, // 🔥 检测 Lightbox 是否打开
 }) {
   // 统一的导航函数 (消除 moveToNext/Prev 重复)
   const navigateTo = useCallback((direction) => {
@@ -60,6 +61,13 @@ export function useKeyboardShortcuts({
       // 防止干扰表单输入
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         return;
+      }
+
+      // 🔥 如果 Lightbox 打开，跳过数字键处理（防止双重执行）
+      if (previewPhotos && (e.key === '1' || e.key === '2' || e.key === '3' ||
+          e.key === '0' || e.key === 'x' || e.key === 'X' ||
+          e.key === 'Delete' || e.key === 'Backspace')) {
+        return; // 让 LightboxPreview 处理
       }
 
       // 确定目标图片
@@ -156,5 +164,6 @@ export function useKeyboardShortcuts({
     extendSelection,
     jumpToEdge,
     selectAll,
+    previewPhotos, // 🔥 添加依赖，检测 Lightbox 状态变化
   ]);
 }
