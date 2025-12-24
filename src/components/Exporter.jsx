@@ -19,6 +19,7 @@ const Exporter = memo(function Exporter({ toast }) {
 
   const photos = usePhotoStore((state) => state.photos);
   const getStats = usePhotoStore((state) => state.getStats);
+  const diagnose = usePhotoStore((state) => state.diagnose);
 
   // 计算实际可导出的照片数量（只统计有 file 对象的照片）
   const getExportableStats = () => {
@@ -42,6 +43,11 @@ const Exporter = memo(function Exporter({ toast }) {
       toast.error('您的浏览器不支持文件夹导出功能。请使用 Chrome 或 Edge 浏览器。');
       return;
     }
+
+    // 🔍 Linus 风格：打开导出对话框时自动运行深度诊断
+    console.log('\n🔧 自动运行 Linus 深度诊断...\n');
+    const diagnosticResult = diagnose();
+    console.log('\n📋 诊断摘要:', diagnosticResult.summary);
 
     setShowModal(true);
   };

@@ -135,11 +135,36 @@ const usePhotoStore = create((set, get) => ({
       };
     });
 
+    // 🧹 Linus 风格：自动清理孤立的 category keys (防止 localStorage 膨胀)
+    const validKeys = new Set();
+    photosWithCategories.forEach(photo => {
+      const photoKey = getPhotoKey(photo);
+      if (photo.category) {
+        validKeys.add(photoKey);
+      }
+    });
+
+    const cleanedCategories = {};
+    let orphanedCount = 0;
+    Object.entries(categories).forEach(([key, value]) => {
+      if (validKeys.has(key)) {
+        cleanedCategories[key] = value;
+      } else {
+        orphanedCount++;
+      }
+    });
+
+    if (orphanedCount > 0) {
+      devLog(`🧹 自动清理了 ${orphanedCount} 个孤立的 category keys`);
+      set({ categories: cleanedCategories });
+      saveCategories(cleanedCategories);
+    }
+
     // 构建文件夹映射
     const folderMap = buildFolderMap(photosWithCategories);
 
     set({ photos: photosWithCategories, folderMap });
-    devLog(`✓ 加载了 ${uniquePhotos.length} 张图片（原始: ${photos.length}）,恢复了 ${Object.keys(categories).length} 个分类标记`);
+    devLog(`✓ 加载了 ${uniquePhotos.length} 张图片（原始: ${photos.length}）,恢复了 ${Object.keys(cleanedCategories).length} 个分类标记`);
   },
 
   addPhotos: (newPhotos) => {
@@ -311,10 +336,42 @@ const usePhotoStore = create((set, get) => ({
     return photos.filter(p => p.category);
   },
 
-  // 🔍 诊断工具：检查数据完整性
+  // 🔍 Linus 风格深度诊断：找出所有数据不一致问题
   diagnose: () => {
     const photos = get().photos;
     const categories = get().categories;
+
+    console.group('🔍 Linus 深度诊断报告');
+
+    // 🚨 检查 localStorage 中的原始数据
+    console.group('📦 localStorage 原始数据');
+    const categoriesKey = getUserStorageKey('categories');
+    const rawData = localStorage.getItem(categoriesKey);
+    console.log('Raw JSON:', rawData);
+    const parsedCategories = rawData ? JSON.parse(rawData) : {};
+    console.log('Parsed categories:', parsedCategories);
+    console.log('Categories keys count:', Object.keys(parsedCategories).length);
+
+    // 检查 key 格式
+    const oldFormatKeys = [];
+    const newFormatKeys = [];
+    Object.keys(parsedCategories).forEach(key => {
+      if (key.includes('|')) {
+        newFormatKeys.push({ key, value: parsedCategories[key] });
+      } else {
+        oldFormatKeys.push({ key, value: parsedCategories[key] });
+      }
+    });
+
+    if (oldFormatKeys.length > 0) {
+      console.warn('⚠️ 发现旧格式 key (path only):', oldFormatKeys.length);
+      console.table(oldFormatKeys.slice(0, 10));
+    }
+    if (newFormatKeys.length > 0) {
+      console.log('✅ 新格式 key (path|size|modified):', newFormatKeys.length);
+      console.table(newFormatKeys.slice(0, 5));
+    }
+    console.groupEnd();
 
     console.group('🔍 数据诊断报告');
 
@@ -366,10 +423,63 @@ const usePhotoStore = create((set, get) => ({
       }
     });
 
+    // 4. 检查 photos 和 categories 映射的匹配情况
+    console.log('\n🔗 Photos vs Categories 匹配检查');
+    const photosWithCategory = photos.filter(p => p.category);
+    console.log(`  photos 中有 category 的: ${photosWithCategory.length}`);
+    console.log(`  categories 映射中的 keys: ${Object.keys(categories).length}`);
+
+    // 检查不匹配
+    const mismatch = [];
+    photosWithCategory.forEach(photo => {
+      const photoKey = getPhotoKey(photo);
+      if (!categories[photoKey]) {
+        mismatch.push({
+          id: photo.id,
+          name: photo.name,
+          category: photo.category,
+          path: photo.path,
+          photoKey,
+          reason: 'photo 有 category 但 categories 中没有这个 key'
+        });
+      } else if (categories[photoKey] !== photo.category) {
+        mismatch.push({
+          id: photo.id,
+          name: photo.name,
+          photoCategory: photo.category,
+          mappingCategory: categories[photoKey],
+          photoKey,
+          reason: 'photo.category 和 categories[key] 不一致'
+        });
+      }
+    });
+
+    if (mismatch.length > 0) {
+      console.warn('⚠️ 发现数据不一致:', mismatch.length);
+      console.table(mismatch);
+    }
+
+    // 检查孤立的 category keys（在 categories 中有但在 photos 中找不到）
+    const orphanedKeys = [];
+    Object.keys(categories).forEach(key => {
+      const found = photos.some(photo => getPhotoKey(photo) === key);
+      if (!found) {
+        orphanedKeys.push({ key, value: categories[key] });
+      }
+    });
+
+    if (orphanedKeys.length > 0) {
+      console.warn('⚠️ 孤立的 category keys (在 categories 中但照片已删除):', orphanedKeys.length);
+      console.table(orphanedKeys.slice(0, 10));
+    }
+
     // 4. 输出报告
-    console.log('📊 总览');
+    console.log('\n📊 总览');
     console.log(`  总照片数: ${photos.length}`);
+    console.log(`  photos 中有 category 的: ${photosWithCategory.length}`);
     console.log(`  categories 映射数: ${Object.keys(categories).length}`);
+    console.log(`  不匹配项: ${mismatch.length}`);
+    console.log(`  孤立 keys: ${orphanedKeys.length}`);
 
     console.log('\n📈 分类统计');
     console.log(`  ✓ 正确: ${byCategory.correct.length} 张`);
@@ -395,14 +505,23 @@ const usePhotoStore = create((set, get) => ({
     return {
       summary: {
         totalPhotos: photos.length,
+        photosWithCategory: photosWithCategory.length,
         categoriesCount: Object.keys(categories).length,
         correct: byCategory.correct.length,
         medium: byCategory.medium.length,
         wrong: byCategory.wrong.length,
-        uncategorized: byCategory.uncategorized.length
+        uncategorized: byCategory.uncategorized.length,
+        mismatchCount: mismatch.length,
+        orphanedKeysCount: orphanedKeys.length,
+        oldFormatKeysCount: oldFormatKeys.length,
+        newFormatKeysCount: newFormatKeys.length,
       },
       duplicateIds,
       duplicatePaths,
+      mismatch,
+      orphanedKeys,
+      oldFormatKeys,
+      newFormatKeys,
       correctPhotos: byCategory.correct
     };
   },
