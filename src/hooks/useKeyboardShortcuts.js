@@ -13,66 +13,46 @@ export function useKeyboardShortcuts({
   setCategoryBatch,
   setSelectedPhotoId,
   clearSelection,
-  togglePhotoSelection,  // 🆕 添加用于范围选择
-  setSelectedPhotos,      // 🆕 添加用于全选
+  togglePhotoSelection,
+  setSelectedPhotos,
 }) {
-  // 导航到下一张
-  const moveToNext = useCallback(() => {
+  // 统一的导航函数 (消除 moveToNext/Prev 重复)
+  const navigateTo = useCallback((direction) => {
     if (!selectedPhotoId || filteredPhotos.length === 0) return;
     const idx = filteredPhotos.findIndex((p) => p.id === selectedPhotoId);
-    if (idx < filteredPhotos.length - 1) {
-      setSelectedPhotoId(filteredPhotos[idx + 1].id);
+    const newIdx = idx + direction;
+
+    if (newIdx >= 0 && newIdx < filteredPhotos.length) {
+      setSelectedPhotoId(filteredPhotos[newIdx].id);
     }
   }, [selectedPhotoId, filteredPhotos, setSelectedPhotoId]);
 
-  // 导航到上一张
-  const moveToPrev = useCallback(() => {
+  // 统一的范围选择函数 (消除 extendSelectionNext/Prev 重复)
+  const extendSelection = useCallback((direction) => {
     if (!selectedPhotoId || filteredPhotos.length === 0) return;
     const idx = filteredPhotos.findIndex((p) => p.id === selectedPhotoId);
-    if (idx > 0) {
-      setSelectedPhotoId(filteredPhotos[idx - 1].id);
-    }
-  }, [selectedPhotoId, filteredPhotos, setSelectedPhotoId]);
+    const newIdx = idx + direction;
 
-  // 🆕 跳到第一张
-  const moveToFirst = useCallback(() => {
-    if (filteredPhotos.length === 0) return;
-    setSelectedPhotoId(filteredPhotos[0].id);
-  }, [filteredPhotos, setSelectedPhotoId]);
-
-  // 🆕 跳到最后一张
-  const moveToLast = useCallback(() => {
-    if (filteredPhotos.length === 0) return;
-    setSelectedPhotoId(filteredPhotos[filteredPhotos.length - 1].id);
-  }, [filteredPhotos, setSelectedPhotoId]);
-
-  // 🆕 范围选择：扩展选择到下一张
-  const extendSelectionNext = useCallback(() => {
-    if (!selectedPhotoId || filteredPhotos.length === 0) return;
-    const idx = filteredPhotos.findIndex((p) => p.id === selectedPhotoId);
-    if (idx < filteredPhotos.length - 1) {
-      const nextPhoto = filteredPhotos[idx + 1];
-      togglePhotoSelection(nextPhoto.id);
-      setSelectedPhotoId(nextPhoto.id);
+    if (newIdx >= 0 && newIdx < filteredPhotos.length) {
+      const targetPhoto = filteredPhotos[newIdx];
+      togglePhotoSelection(targetPhoto.id);
+      setSelectedPhotoId(targetPhoto.id);
     }
   }, [selectedPhotoId, filteredPhotos, togglePhotoSelection, setSelectedPhotoId]);
 
-  // 🆕 范围选择：扩展选择到上一张
-  const extendSelectionPrev = useCallback(() => {
-    if (!selectedPhotoId || filteredPhotos.length === 0) return;
-    const idx = filteredPhotos.findIndex((p) => p.id === selectedPhotoId);
-    if (idx > 0) {
-      const prevPhoto = filteredPhotos[idx - 1];
-      togglePhotoSelection(prevPhoto.id);
-      setSelectedPhotoId(prevPhoto.id);
-    }
-  }, [selectedPhotoId, filteredPhotos, togglePhotoSelection, setSelectedPhotoId]);
+  // 跳到边界 (消除 moveToFirst/Last 重复)
+  const jumpToEdge = useCallback((toEnd) => {
+    if (filteredPhotos.length === 0) return;
+    const targetPhoto = toEnd
+      ? filteredPhotos[filteredPhotos.length - 1]
+      : filteredPhotos[0];
+    setSelectedPhotoId(targetPhoto.id);
+  }, [filteredPhotos, setSelectedPhotoId]);
 
-  // 🆕 全选所有可见照片
+  // 全选
   const selectAll = useCallback(() => {
     if (filteredPhotos.length === 0) return;
-    const allPhotoIds = filteredPhotos.map(p => p.id);
-    setSelectedPhotos(allPhotoIds);
+    setSelectedPhotos(filteredPhotos.map(p => p.id));
   }, [filteredPhotos, setSelectedPhotos]);
 
   useEffect(() => {
@@ -82,7 +62,7 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // 确定目标图片：框选的图片或当前选中的图片
+      // 确定目标图片
       const targetPhotos =
         selectedPhotos.length > 0
           ? selectedPhotos
@@ -115,42 +95,50 @@ export function useKeyboardShortcuts({
 
         // 如果是单张图片，移动到下一张
         if (targetPhotos.length === 1) {
-          moveToNext();
+          navigateTo(1);
         }
       };
 
-      // 处理快捷键
-      if (e.key === KEYBOARD_SHORTCUTS.CORRECT) {
-        batchSetCategory(CATEGORY.CORRECT);
-      } else if (e.key === KEYBOARD_SHORTCUTS.MEDIUM) {
-        batchSetCategory(CATEGORY.MEDIUM);
-      } else if (e.key === KEYBOARD_SHORTCUTS.WRONG) {
-        batchSetCategory(CATEGORY.WRONG);
-      } else if (KEYBOARD_SHORTCUTS.CLEAR.includes(e.key)) {
+      // 查找表：替代 if-else 链 (Linus style)
+      const simpleKeyMap = {
+        [KEYBOARD_SHORTCUTS.CORRECT]: () => batchSetCategory(CATEGORY.CORRECT),
+        [KEYBOARD_SHORTCUTS.MEDIUM]: () => batchSetCategory(CATEGORY.MEDIUM),
+        [KEYBOARD_SHORTCUTS.WRONG]: () => batchSetCategory(CATEGORY.WRONG),
+        [KEYBOARD_SHORTCUTS.FIRST]: () => jumpToEdge(false),
+        [KEYBOARD_SHORTCUTS.LAST]: () => jumpToEdge(true),
+      };
+
+      // 处理数组类型的快捷键 (CLEAR)
+      if (KEYBOARD_SHORTCUTS.CLEAR.includes(e.key)) {
         batchSetCategory(null);
-      } else if (e.key === KEYBOARD_SHORTCUTS.PREV) {
+        return;
+      }
+
+      // 处理简单按键映射
+      if (simpleKeyMap[e.key]) {
         e.preventDefault();
+        simpleKeyMap[e.key]();
+        return;
+      }
+
+      // 处理方向键 (支持 Shift 修饰键)
+      if (e.key === KEYBOARD_SHORTCUTS.PREV || e.key === KEYBOARD_SHORTCUTS.NEXT) {
+        e.preventDefault();
+        const direction = e.key === KEYBOARD_SHORTCUTS.NEXT ? 1 : -1;
+
         if (e.shiftKey) {
-          extendSelectionPrev();
+          extendSelection(direction);
         } else {
-          moveToPrev();
+          navigateTo(direction);
         }
-      } else if (e.key === KEYBOARD_SHORTCUTS.NEXT) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          extendSelectionNext();
-        } else {
-          moveToNext();
-        }
-      } else if (e.key === KEYBOARD_SHORTCUTS.FIRST) {
-        e.preventDefault();
-        moveToFirst();
-      } else if (e.key === KEYBOARD_SHORTCUTS.LAST) {
-        e.preventDefault();
-        moveToLast();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        return;
+      }
+
+      // 处理 Ctrl+A / Cmd+A
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
         e.preventDefault();
         selectAll();
+        return;
       }
     };
 
@@ -164,12 +152,9 @@ export function useKeyboardShortcuts({
     setCategoryBatch,
     setSelectedPhotoId,
     clearSelection,
-    moveToNext,
-    moveToPrev,
-    moveToFirst,
-    moveToLast,
-    extendSelectionNext,
-    extendSelectionPrev,
+    navigateTo,
+    extendSelection,
+    jumpToEdge,
     selectAll,
   ]);
 }
