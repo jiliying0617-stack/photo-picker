@@ -2,6 +2,7 @@ import { memo, useRef, useEffect, useState, useCallback } from 'react';
 import { Grid } from 'react-window';
 import { getFileFormat, getFormatBadgeColor } from '../utils/imageUtils';
 import { useLRUObjectUrls } from '../hooks/useLRUObjectUrls';
+import { LAYOUT, CACHE, CATEGORY_ICONS } from '../constants';
 
 /**
  * 虚拟化照片网格组件
@@ -35,8 +36,8 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   // LRU 缓存的 Object URL 管理 - 防止内存泄漏
-  // 最多缓存 200 个 URL，自动淘汰最少使用的
-  const getPhotoUrl = useLRUObjectUrls(200);
+  // 最多缓存 CACHE.MAX_OBJECT_URLS 个 URL，自动淘汰最少使用的
+  const getPhotoUrl = useLRUObjectUrls(CACHE.MAX_OBJECT_URLS);
 
   // 监听容器尺寸变化
   useEffect(() => {
@@ -64,8 +65,8 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
 
   // 计算网格尺寸
   const rowCount = Math.ceil(photos.length / columns);
-  const gap = 16; // 对应 gap-4 (1rem = 16px)
-  const padding = 16; // 对应 p-4
+  const gap = LAYOUT.GRID_GAP;
+  const padding = LAYOUT.GRID_PADDING;
 
   // 计算每个单元格的宽度和高度
   const availableWidth = containerSize.width - padding * 2;
@@ -186,12 +187,7 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
     // 渲染真实照片
     const isSelected = selectedPhotoId === photo.id;
     const isBoxSelected = selectedPhotos.includes(photo.id);
-    const categoryIcons = {
-      correct: { icon: '✓', color: 'text-green-600' },
-      medium: { icon: '~', color: 'text-yellow-600' },
-      wrong: { icon: '✕', color: 'text-red-600' },
-    };
-    const config = photo.category ? categoryIcons[photo.category] : null;
+    const config = photo.category ? CATEGORY_ICONS[photo.category] : null;
     const fileFormat = getFileFormat(photo.name);
     const formatColors = getFormatBadgeColor(fileFormat);
 
@@ -345,7 +341,7 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
         defaultWidth={containerSize.width}
         rowCount={rowCount}
         rowHeight={rowHeight}
-        overscanCount={5}
+        overscanCount={LAYOUT.OVERSCAN_COUNT}
         onScroll={handleScroll}
         className="scrollbar-thin"
         style={{ padding: `${padding}px` }}

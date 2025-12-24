@@ -21,6 +21,7 @@ import {
 } from './hooks';
 import Toast from './components/Toast';
 import { devLog } from './utils/devLog';
+import { ANIMATION } from './constants';
 
 function App() {
   // Zustand store
@@ -317,14 +318,14 @@ function App() {
                     behavior: 'smooth',
                   });
 
-                  setTimeout(() => setSelectedPhotoId(finalPhoto.id), 200);
+                  setTimeout(() => setSelectedPhotoId(finalPhoto.id), ANIMATION.SELECT_AFTER_SCROLL_DELAY);
                 } else {
                   // 备用方案：直接选中照片
                   setSelectedPhotoId(finalPhoto.id);
                 }
-              }, 150);
+              }, ANIMATION.TRANSITION_DELAY);
             } else if (isCompareMode && currentPreviewGroupIndex >= 0) {
-              setTimeout(() => scrollToGroup(currentPreviewGroupIndex), 150);
+              setTimeout(() => scrollToGroup(currentPreviewGroupIndex), ANIMATION.TRANSITION_DELAY);
             }
           }}
           allPhotos={displayPhotos}

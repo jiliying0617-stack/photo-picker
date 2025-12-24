@@ -3,6 +3,10 @@ import { getUserStorageKey } from '../utils/userIdentity';
 import { devLog, devError } from '../utils/devLog';
 import { debounce, runWhenIdle } from '../utils/debounce';
 
+/** @typedef {import('../types').Photo} Photo */
+/** @typedef {import('../types').CategoryType} CategoryType */
+/** @typedef {import('../types').FolderMap} FolderMap */
+
 // 从 localStorage 加载列数配置
 function loadColumns() {
   try {
@@ -83,6 +87,10 @@ function getPhotoKey(photo) {
  * 4. 自动清理孤立的 category keys
  *
  * 调用时机：任何可能改变数据的操作后
+ *
+ * @param {Photo[]} rawPhotos - 原始照片数组
+ * @param {Record<string, CategoryType>} categories - 分类映射
+ * @returns {{photos: Photo[], folderMap: FolderMap, categories: Record<string, CategoryType>}}
  */
 function syncState(rawPhotos, categories) {
   // Step 1: 去重（基于 path）
@@ -164,6 +172,7 @@ const usePhotoStore = create((set, get) => ({
 
   /**
    * 设置照片列表（导入时调用）
+   * @param {Photo[]} rawPhotos - 原始照片数组
    */
   setPhotos: (rawPhotos) => {
     const categories = get().categories;
@@ -184,6 +193,8 @@ const usePhotoStore = create((set, get) => ({
 
   /**
    * 设置单张照片的分类
+   * @param {string} photoId - 照片 ID
+   * @param {CategoryType} category - 分类
    */
   setCategory: (photoId, category) => {
     // 验证分类值
@@ -217,6 +228,8 @@ const usePhotoStore = create((set, get) => ({
 
   /**
    * 批量设置分类（性能优化版）
+   * @param {string[]} photoIds - 照片 ID 数组
+   * @param {CategoryType} category - 分类
    */
   setCategoryBatch: (photoIds, category) => {
     if (!photoIds || photoIds.length === 0) return;

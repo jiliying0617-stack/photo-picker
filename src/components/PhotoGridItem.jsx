@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { getFileFormat, getFormatBadgeColor } from '../utils/imageUtils';
+import { CATEGORY_ICONS } from '../constants';
 
 /**
  * 单个照片网格项组件
@@ -62,13 +63,7 @@ const PhotoGridItem = memo(function PhotoGridItem({
   // 处理真实照片
   const isSelected = selectedPhotoId === photo.id;
   const isBoxSelected = selectedPhotos.includes(photo.id);
-
-  const categoryIcons = {
-    correct: { icon: '✓', color: 'text-green-600' },
-    medium: { icon: '~', color: 'text-yellow-600' },
-    wrong: { icon: '✕', color: 'text-red-600' },
-  };
-  const config = photo.category ? categoryIcons[photo.category] : null;
+  const config = photo.category ? CATEGORY_ICONS[photo.category] : null;
 
   // 获取文件格式信息
   const fileFormat = getFileFormat(photo.name);
