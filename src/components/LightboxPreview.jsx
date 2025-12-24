@@ -141,15 +141,19 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         handleNextGroup();
       } else if (e.key === '1') {
         e.preventDefault();
+        e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
         handleCategoryAll('correct');
       } else if (e.key === '2') {
         e.preventDefault();
+        e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
         handleCategoryAll('medium');
       } else if (e.key === '3') {
         e.preventDefault();
+        e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
         handleCategoryAll('wrong');
       } else if (e.key === '0' || e.key === 'x' || e.key === 'X') {
         e.preventDefault();
+        e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
         handleCategoryAll(null);
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault();
