@@ -77,27 +77,49 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     }
   }, [firstRealPhoto, lastViewedPhotoId]);
 
-  // 切换到下一组（空格键：第一张图不动，其余图片切换下一组）
-  // 重要：第一张图片保持不变，其余图片向下滚动一组
+  // 切换到下一组（空格键：第一张图不动，其余图片各自切换到所属文件夹的下一张）
+  // 重要：第一张图片保持不变，其余图片在各自文件夹中独立前进
   const handleSpaceKey = useCallback(() => {
     if (!allPhotos || !onGroupChange) return;
 
-    const nextGroupStartIndex = (currentGroupIndex + 1) * photosPerGroup;
-    if (nextGroupStartIndex >= allPhotos.length) return; // 已经是最后一组
-
-    // 构建新的 photos 数组：第一张图不变，其余图片来自下一组
     const newPhotos = [];
 
     // 第一张图保持不变
     newPhotos.push(photosWithUrls.photos[0]);
 
-    // 其余图片来自下一组（从索引1开始）
+    // 其余图片各自在所属文件夹中前进一张
     for (let i = 1; i < photosPerGroup; i++) {
-      newPhotos.push(allPhotos[nextGroupStartIndex + i]);
+      const currentPhoto = photosWithUrls.photos[i];
+
+      if (!currentPhoto) {
+        // 如果当前是占位符，保持占位符
+        newPhotos.push(null);
+        continue;
+      }
+
+      // 找到当前图片在 allPhotos 中的索引
+      const currentIndex = allPhotos.findIndex(p => p && p.id === currentPhoto.id);
+
+      if (currentIndex === -1) {
+        // 找不到，保持原样
+        newPhotos.push(currentPhoto);
+        continue;
+      }
+
+      // 计算下一张图片的索引（在同一文件夹列中前进）
+      const nextIndex = currentIndex + photosPerGroup;
+
+      if (nextIndex < allPhotos.length) {
+        // 有下一张
+        newPhotos.push(allPhotos[nextIndex]);
+      } else {
+        // 没有下一张了，显示占位符
+        newPhotos.push(null);
+      }
     }
 
     onGroupChange(newPhotos);
-  }, [allPhotos, onGroupChange, currentGroupIndex, photosPerGroup, photosWithUrls.photos]);
+  }, [allPhotos, onGroupChange, photosPerGroup, photosWithUrls.photos]);
 
   // 切换到下一组（下键：所有图片一起切换）
   // 重要：不过滤 null，保持占位符，严格按组顺序切换
