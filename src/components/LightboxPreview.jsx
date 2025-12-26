@@ -9,6 +9,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   const [contextMenu, setContextMenu] = useState(null); // 右键菜单 { x, y, photoId }
   const [isCompareMode, setIsCompareMode] = useState(false); // 相邻对比模式：true表示开启全图相邻对比
   const [lastViewedPhotoId, setLastViewedPhotoId] = useState(null); // 追踪最后查看的照片ID
+  const [copyPathNotification, setCopyPathNotification] = useState(false); // 复制路径成功提示
   const setCategory = usePhotoStore((state) => state.setCategory);
   const setCategoryBatch = usePhotoStore((state) => state.setCategoryBatch); // 🔥 使用批量 API
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
@@ -76,7 +77,29 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     }
   }, [firstRealPhoto, lastViewedPhotoId]);
 
-  // 切换到下一组
+  // 切换到下一组（空格键：第一张图不动，其余图片切换下一组）
+  // 重要：第一张图片保持不变，其余图片向下滚动一组
+  const handleSpaceKey = useCallback(() => {
+    if (!allPhotos || !onGroupChange) return;
+
+    const nextGroupStartIndex = (currentGroupIndex + 1) * photosPerGroup;
+    if (nextGroupStartIndex >= allPhotos.length) return; // 已经是最后一组
+
+    // 构建新的 photos 数组：第一张图不变，其余图片来自下一组
+    const newPhotos = [];
+
+    // 第一张图保持不变
+    newPhotos.push(photosWithUrls.photos[0]);
+
+    // 其余图片来自下一组（从索引1开始）
+    for (let i = 1; i < photosPerGroup; i++) {
+      newPhotos.push(allPhotos[nextGroupStartIndex + i]);
+    }
+
+    onGroupChange(newPhotos);
+  }, [allPhotos, onGroupChange, currentGroupIndex, photosPerGroup, photosWithUrls.photos]);
+
+  // 切换到下一组（下键：所有图片一起切换）
   // 重要：不过滤 null，保持占位符，严格按组顺序切换
   const handleNextGroup = useCallback(() => {
     if (!allPhotos || !onGroupChange) return;
@@ -123,6 +146,40 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     }
   }, [photos, setCategoryBatch]);
 
+  // 复制文件路径到剪贴板
+  const handleCopyPath = useCallback(async (photoId) => {
+    const photo = photos.find(p => p && p.id === photoId);
+    if (!photo) return;
+
+    try {
+      // 复制文件路径到剪贴板
+      await navigator.clipboard.writeText(photo.path);
+
+      // 显示成功提示
+      setCopyPathNotification(true);
+      setTimeout(() => setCopyPathNotification(false), 2000);
+
+      console.log('📋 已复制文件路径:', photo.path);
+    } catch (error) {
+      console.error('复制路径失败:', error);
+      // 降级方案：使用旧的复制方法
+      const textArea = document.createElement('textarea');
+      textArea.value = photo.path;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopyPathNotification(true);
+        setTimeout(() => setCopyPathNotification(false), 2000);
+      } catch (err) {
+        console.error('降级复制方法也失败:', err);
+      }
+      document.body.removeChild(textArea);
+    }
+  }, [photos]);
+
   // 键盘快捷键
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -133,6 +190,10 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
           console.log('🚪 关闭预览，最后查看的照片ID:', lastViewedPhotoId);
           onClose(lastViewedPhotoId);
         }
+      } else if (e.key === ' ' || e.key === 'Spacebar') {
+        // 空格键：第一张图不动，其余图片切换下一组
+        e.preventDefault();
+        handleSpaceKey();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         handlePrevGroup();
@@ -167,7 +228,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, photosWithUrls.photos, lastViewedPhotoId]);
+  }, [onClose, handleSpaceKey, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, photosWithUrls.photos, lastViewedPhotoId]);
 
   // Q键按住对比，松开恢复
   useEffect(() => {
@@ -309,7 +370,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
             </span>
           )}
           <span className="text-gray-400 text-xs">
-            {allPhotos && totalGroups > 1 ? '↑↓切换组 · ' : ''}
+            {allPhotos && totalGroups > 1 ? '空格键:第1图不动其余切换 · ↓键:全部切换 · ' : ''}
             按住Q叠图对比 · 滚轮缩放 · 拖拽平移 · R键重置
           </span>
         </div>
@@ -534,7 +595,12 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
       {/* 底部提示栏 - 固定高度 */}
       <div className="h-10 bg-black/80 flex items-center justify-center gap-8 px-6 text-xs text-gray-400 flex-shrink-0">
-        <span>← → 切换</span>
+        {allPhotos && totalGroups > 1 && (
+          <>
+            <span className="text-cyan-400">空格 第1图不动其余切换</span>
+            <span className="text-cyan-400">↓ 全部切换</span>
+          </>
+        )}
         <span className="text-purple-400">按住Q 叠图对比</span>
         <span>滚轮 缩放</span>
         <span>拖拽 平移</span>
@@ -601,6 +667,29 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
               <span className="text-gray-400 font-medium">取消标签</span>
               <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">X</span>
             </button>
+            <div className="h-px bg-gray-700 my-1"></div>
+            <button
+              onClick={() => {
+                handleCopyPath(contextMenu.photoId);
+                setContextMenu(null);
+              }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
+            >
+              <span className="text-blue-400 font-bold text-xl">📋</span>
+              <span className="text-white font-medium">复制文件路径</span>
+              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">Cmd+Shift+G</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 复制路径成功提示 */}
+      {copyPathNotification && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[80] bg-green-600 text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-3 animate-fade-in">
+          <span className="text-2xl">✅</span>
+          <div>
+            <div className="font-bold">路径已复制到剪贴板</div>
+            <div className="text-sm opacity-90">在访达中按 Cmd+Shift+G 粘贴路径打开</div>
           </div>
         </div>
       )}
