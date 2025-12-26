@@ -48,10 +48,10 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
       });
     });
 
-    // 排序并返回
+    // 返回文件夹内图片（保持 filteredPhotos 中的原始顺序，不额外排序）
     return selectedFolders.map(folderPath => {
       const photos = folderToPhotosMap.get(folderPath);
-      return photos.sort((a, b) => a.name.localeCompare(b.name));
+      return photos; // 保持文件夹内的原始顺序
     });
   }, [isCompareMode, selectedFolders, filteredPhotos]);
 
