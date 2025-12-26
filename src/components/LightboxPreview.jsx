@@ -54,10 +54,17 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   }, [photosWithUrls]);
 
   // 计算当前组在所有图片中的位置
-  // 重要：不过滤 null，保持占位符，确保每组大小固定
+  // 重要：allPhotos 已过滤占位符，按主面板顺序排列
   const photosPerGroup = photosWithUrls.photos.length;
   const firstRealPhoto = photosWithUrls.photos.find(p => p);
-  const currentGroupIndex = allPhotos && firstRealPhoto ? Math.floor(allPhotos.findIndex(p => p && p.id === firstRealPhoto.id) / photosPerGroup) : 0;
+
+  // 找到当前组第一张照片在 allPhotos 中的索引
+  const firstPhotoIndexInAll = allPhotos && firstRealPhoto
+    ? allPhotos.findIndex(p => p && p.id === firstRealPhoto.id)
+    : 0;
+
+  // 计算当前组索引（按主面板顺序）
+  const currentGroupIndex = Math.floor(firstPhotoIndexInAll / photosPerGroup);
   const totalGroups = allPhotos ? Math.ceil(allPhotos.length / photosPerGroup) : 1;
 
   // 性能优化: 使用 ref 存储所有图片元素和当前位置
@@ -122,30 +129,32 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   }, [allPhotos, onGroupChange, photosPerGroup, photosWithUrls.photos]);
 
   // 切换到下一组（下键：所有图片一起切换）
-  // 重要：不过滤 null，保持占位符，严格按组顺序切换
+  // 重要：按主面板顺序切换，allPhotos 已过滤占位符
   const handleNextGroup = useCallback(() => {
     if (!allPhotos || !onGroupChange) return;
 
-    const nextGroupStartIndex = (currentGroupIndex + 1) * photosPerGroup;
+    // 下一组的起始索引 = 当前组起始索引 + 组大小
+    const nextGroupStartIndex = firstPhotoIndexInAll + photosPerGroup;
     if (nextGroupStartIndex < allPhotos.length) {
-      // 不过滤 null，直接切片，保持占位符
+      // 从 allPhotos 中取下一组照片（按主面板顺序）
       const nextGroupPhotos = allPhotos.slice(nextGroupStartIndex, nextGroupStartIndex + photosPerGroup);
       onGroupChange(nextGroupPhotos);
     }
-  }, [allPhotos, onGroupChange, currentGroupIndex, photosPerGroup]);
+  }, [allPhotos, onGroupChange, firstPhotoIndexInAll, photosPerGroup]);
 
   // 切换到上一组
-  // 重要：不过滤 null，保持占位符，严格按组顺序切换
+  // 重要：按主面板顺序切换，allPhotos 已过滤占位符
   const handlePrevGroup = useCallback(() => {
     if (!allPhotos || !onGroupChange) return;
 
-    if (currentGroupIndex > 0) {
-      const prevGroupStartIndex = (currentGroupIndex - 1) * photosPerGroup;
-      // 不过滤 null，直接切片，保持占位符
+    // 上一组的起始索引 = 当前组起始索引 - 组大小
+    const prevGroupStartIndex = firstPhotoIndexInAll - photosPerGroup;
+    if (prevGroupStartIndex >= 0) {
+      // 从 allPhotos 中取上一组照片（按主面板顺序）
       const prevGroupPhotos = allPhotos.slice(prevGroupStartIndex, prevGroupStartIndex + photosPerGroup);
       onGroupChange(prevGroupPhotos);
     }
-  }, [allPhotos, onGroupChange, currentGroupIndex, photosPerGroup]);
+  }, [allPhotos, onGroupChange, firstPhotoIndexInAll, photosPerGroup]);
 
   // 点击其他地方关闭右键菜单
   useEffect(() => {
