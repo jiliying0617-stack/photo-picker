@@ -77,7 +77,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     }
   }, [firstRealPhoto, lastViewedPhotoId]);
 
-  // 切换到下一组（空格键：第一张图不动，其余图片各自切换到所属文件夹的下一张）
+  // 切换到下一组（空格键：第一张图不动，其余图片各自切换到所属文件夹的下一张，自动跳过占位符）
   // 重要：第一张图片保持不变，其余图片在各自文件夹中独立前进
   const handleSpaceKey = useCallback(() => {
     if (!allPhotos || !onGroupChange) return;
@@ -87,7 +87,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     // 第一张图保持不变
     newPhotos.push(photosWithUrls.photos[0]);
 
-    // 其余图片各自在所属文件夹中前进一张
+    // 其余图片各自在所属文件夹中前进一张，跳过占位符
     for (let i = 1; i < photosPerGroup; i++) {
       const currentPhoto = photosWithUrls.photos[i];
 
@@ -106,32 +106,47 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         continue;
       }
 
-      // 计算下一张图片的索引（在同一文件夹列中前进）
-      const nextIndex = currentIndex + photosPerGroup;
+      // 寻找下一张非占位符图片（跳过 null）
+      let nextIndex = currentIndex + photosPerGroup;
+      while (nextIndex < allPhotos.length && !allPhotos[nextIndex]) {
+        nextIndex += photosPerGroup;
+      }
 
       if (nextIndex < allPhotos.length) {
-        // 有下一张
+        // 找到下一张非占位符图片
         newPhotos.push(allPhotos[nextIndex]);
       } else {
-        // 没有下一张了，显示占位符
-        newPhotos.push(null);
+        // 没有下一张了，保持当前图片
+        newPhotos.push(currentPhoto);
       }
     }
 
     onGroupChange(newPhotos);
   }, [allPhotos, onGroupChange, photosPerGroup, photosWithUrls.photos]);
 
-  // 切换到下一组（下键：所有图片一起切换）
-  // 重要：不过滤 null，保持占位符，严格按组顺序切换
+  // 切换到下一组（下键：所有图片一起切换，自动跳过全是占位符的组）
+  // 重要：跳过全是 null 的组，找到下一个包含真实图片的组
   const handleNextGroup = useCallback(() => {
     if (!allPhotos || !onGroupChange) return;
 
-    const nextGroupStartIndex = (currentGroupIndex + 1) * photosPerGroup;
-    if (nextGroupStartIndex < allPhotos.length) {
-      // 不过滤 null，直接切片，保持占位符
+    let nextGroupStartIndex = (currentGroupIndex + 1) * photosPerGroup;
+
+    // 跳过全是占位符的组，找到包含至少一张真实图片的组
+    while (nextGroupStartIndex < allPhotos.length) {
       const nextGroupPhotos = allPhotos.slice(nextGroupStartIndex, nextGroupStartIndex + photosPerGroup);
-      onGroupChange(nextGroupPhotos);
+      const hasRealPhoto = nextGroupPhotos.some(p => p !== null);
+
+      if (hasRealPhoto) {
+        // 找到包含真实图片的组，切换到该组
+        onGroupChange(nextGroupPhotos);
+        return;
+      }
+
+      // 当前组全是占位符，继续找下一组
+      nextGroupStartIndex += photosPerGroup;
     }
+
+    // 没有找到包含真实图片的组，不做任何操作
   }, [allPhotos, onGroupChange, currentGroupIndex, photosPerGroup]);
 
   // 切换到上一组
