@@ -273,48 +273,43 @@ function App() {
           onClose={(lastViewedPhotoId) => {
             devLog('📥 App收到关闭请求，照片ID:', lastViewedPhotoId);
 
-            // ⚠️ 重要：必须在 closePreview() 之前查找照片，否则 previewPhotos 会被清空
-            const viewedPhoto = lastViewedPhotoId
-              ? previewPhotos.find(p => p && p.id === lastViewedPhotoId)
-              : previewPhotos.find(p => p && p.id); // 备用：第一张真实照片
-
-            // 如果没找到，尝试在 displayPhotos 中查找（备用方案）
-            let finalPhoto = viewedPhoto;
-            if (!finalPhoto && lastViewedPhotoId) {
-              finalPhoto = displayPhotos.find(p => p && p.id === lastViewedPhotoId);
-            }
-
-            // 然后再关闭预览
+            // 关闭预览并清除选择
             closePreview();
             clearSelection();
 
-            // 关闭预览后滚动到该照片位置
-            if (finalPhoto) {
-              setTimeout(() => {
-                const photoIndex = displayPhotos.findIndex(p => p && p.id === finalPhoto.id);
-
-                if (photoIndex >= 0 && virtualGridRef?.scrollToCell) {
-                  const rowIndex = Math.floor(photoIndex / compareColumns);
-                  const columnIndex = photoIndex % compareColumns;
-
-                  devLog('📍 关闭预览，跳转到照片:', finalPhoto.id, '位置:', rowIndex, columnIndex);
-
-                  virtualGridRef.scrollToCell({
-                    rowIndex,
-                    columnIndex,
-                    rowAlign: 'center',
-                    columnAlign: 'center',
-                    behavior: 'smooth',
-                  });
-
-                  setTimeout(() => setSelectedPhotoId(finalPhoto.id), ANIMATION.SELECT_AFTER_SCROLL_DELAY);
-                } else {
-                  // 备用方案：直接选中照片
-                  setSelectedPhotoId(finalPhoto.id);
-                }
-              }, ANIMATION.TRANSITION_DELAY);
-            } else if (isCompareMode && currentPreviewGroupIndex >= 0) {
+            // 关闭预览后滚动到组的位置
+            if (enableGroupNavigation && currentPreviewGroupIndex >= 0) {
+              // 对比模式或分组浏览模式：滚动到组的位置
+              devLog('📍 关闭预览，跳转到组:', currentPreviewGroupIndex);
               setTimeout(() => scrollToGroup(currentPreviewGroupIndex), ANIMATION.TRANSITION_DELAY);
+            } else if (lastViewedPhotoId) {
+              // 普通模式：滚动到具体照片
+              const finalPhoto = displayPhotos.find(p => p && p.id === lastViewedPhotoId);
+              if (finalPhoto) {
+                setTimeout(() => {
+                  const photoIndex = displayPhotos.findIndex(p => p && p.id === finalPhoto.id);
+
+                  if (photoIndex >= 0 && virtualGridRef?.scrollToCell) {
+                    const rowIndex = Math.floor(photoIndex / compareColumns);
+                    const columnIndex = photoIndex % compareColumns;
+
+                    devLog('📍 关闭预览，跳转到照片:', finalPhoto.id, '位置:', rowIndex, columnIndex);
+
+                    virtualGridRef.scrollToCell({
+                      rowIndex,
+                      columnIndex,
+                      rowAlign: 'center',
+                      columnAlign: 'center',
+                      behavior: 'smooth',
+                    });
+
+                    setTimeout(() => setSelectedPhotoId(finalPhoto.id), ANIMATION.SELECT_AFTER_SCROLL_DELAY);
+                  } else {
+                    // 备用方案：直接选中照片
+                    setSelectedPhotoId(finalPhoto.id);
+                  }
+                }, ANIMATION.TRANSITION_DELAY);
+              }
             }
           }}
           allPhotos={displayPhotos}
