@@ -10,6 +10,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   const [isCompareMode, setIsCompareMode] = useState(false); // 相邻对比模式：true表示开启全图相邻对比
   const [lastViewedPhotoId, setLastViewedPhotoId] = useState(null); // 追踪最后查看的照片ID
   const [copyPathNotification, setCopyPathNotification] = useState(false); // 复制路径成功提示
+  const [hoveredPhotoId, setHoveredPhotoId] = useState(null); // 追踪鼠标悬停的图片ID
   const setCategory = usePhotoStore((state) => state.setCategory);
   const setCategoryBatch = usePhotoStore((state) => state.setCategoryBatch); // 🔥 使用批量 API
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
@@ -177,6 +178,17 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     }
   }, [photos, setCategoryBatch]);
 
+  // 智能打标：悬停在图片上时打标单张，悬停在图片外时打标所有照片
+  const handleCategory = useCallback((category) => {
+    if (hoveredPhotoId) {
+      // 悬停在具体图片上：只打标这一张
+      setCategory(hoveredPhotoId, category);
+    } else {
+      // 悬停在图片外：打标所有照片
+      handleCategoryAll(category);
+    }
+  }, [hoveredPhotoId, setCategory, handleCategoryAll]);
+
   // 在访达中显示文件
   const handleShowInFinder = useCallback(async (photoId) => {
     const photo = photos.find(p => p && p.id === photoId);
@@ -296,19 +308,19 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       } else if (e.key === '1') {
         e.preventDefault();
         e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
-        handleCategoryAll('correct');
+        handleCategory('correct');
       } else if (e.key === '2') {
         e.preventDefault();
         e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
-        handleCategoryAll('medium');
+        handleCategory('medium');
       } else if (e.key === '3') {
         e.preventDefault();
         e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
-        handleCategoryAll('wrong');
+        handleCategory('wrong');
       } else if (e.key === '0' || e.key === 'x' || e.key === 'X') {
         e.preventDefault();
         e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
-        handleCategoryAll(null);
+        handleCategory(null);
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault();
         setScale(1);
@@ -321,7 +333,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handleSpaceKey, handleNextGroup, handlePrevGroup, handleCategoryAll, contextMenu, photosWithUrls.photos, lastViewedPhotoId]);
+  }, [onClose, handleSpaceKey, handleNextGroup, handlePrevGroup, handleCategory, contextMenu, photosWithUrls.photos, lastViewedPhotoId]);
 
   // Q键按住对比，松开恢复
   useEffect(() => {
@@ -497,19 +509,19 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
             </>
           )}
           <button
-            onClick={() => handleCategoryAll('correct')}
+            onClick={() => handleCategory('correct')}
             className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
           >
             1️⃣ 正确
           </button>
           <button
-            onClick={() => handleCategoryAll('medium')}
+            onClick={() => handleCategory('medium')}
             className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-medium transition-colors"
           >
             2️⃣ 适中
           </button>
           <button
-            onClick={() => handleCategoryAll('wrong')}
+            onClick={() => handleCategory('wrong')}
             className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors"
           >
             3️⃣ 错误
@@ -600,6 +612,8 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                 }}
                 onMouseDown={handleMouseDown}
                 onContextMenu={handleContextMenu}
+                onMouseEnter={() => setHoveredPhotoId(photo.id)}
+                onMouseLeave={() => setHoveredPhotoId(null)}
               >
                 {/* 图片序号 */}
                 <div className="absolute top-3 left-3 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold z-10 pointer-events-none">
