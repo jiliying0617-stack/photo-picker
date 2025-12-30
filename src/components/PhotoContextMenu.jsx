@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { exportGroupAsPNG, exportGroupAsSimpleGIF } from '../utils/exportUtils';
 
 function PhotoContextMenu({
@@ -6,8 +7,11 @@ function PhotoContextMenu({
   onClose,
   isCompareMode = false,
   displayPhotos = [],
-  compareColumns = 1
+  compareColumns = 1,
+  allPhotos = [] // 新增：所有照片列表
 }) {
+  const [showingInFinder, setShowingInFinder] = useState(false);
+
   if (!contextMenu) return null;
 
   // 计算当前照片所在的组（对比模式下）
@@ -28,6 +32,92 @@ function PhotoContextMenu({
   };
 
   const currentGroup = getCurrentGroup();
+
+  // 获取当前照片的完整信息
+  const getCurrentPhoto = () => {
+    const photo = displayPhotos.find(p => p && p.id === contextMenu.photoId);
+    if (!photo) return null;
+    if (!photo.file && allPhotos.length > 0) {
+      return allPhotos.find(p => p && p.id === contextMenu.photoId) || photo;
+    }
+    return photo;
+  };
+
+  const currentPhoto = getCurrentPhoto();
+
+  // 在访达中显示文件
+  const handleShowInFinder = async () => {
+    if (!currentPhoto) {
+      console.warn('无法获取当前照片信息');
+      return;
+    }
+
+    setShowingInFinder(true);
+
+    try {
+      // 优先方案: 使用浏览器扩展（真正的系统级打开）
+      if (window.showInFinder && currentPhoto.path) {
+        try {
+          await window.showInFinder(currentPhoto.path);
+          console.log('✅ 已通过扩展在访达中打开:', currentPhoto.path);
+          setTimeout(() => {
+            setShowingInFinder(false);
+            onClose();
+          }, 800);
+          return;
+        } catch (extError) {
+          console.warn('扩展调用失败，回退到下载方案:', extError.message);
+        }
+      }
+
+      // 回退方案1: 如果有 fileHandle，使用它来触发下载（浏览器会显示"在访达中显示"）
+      if (currentPhoto.fileHandle) {
+        const file = await currentPhoto.fileHandle.getFile();
+        const url = URL.createObjectURL(file);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+
+        console.log('📁 已触发下载，请在浏览器下载栏点击"在访达中显示"');
+      }
+      // 回退方案2: 如果有 file 对象，同样触发下载
+      else if (currentPhoto.file) {
+        const url = URL.createObjectURL(currentPhoto.file);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = currentPhoto.file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+
+        console.log('📁 已触发下载，请在浏览器下载栏点击"在访达中显示"');
+      }
+
+      setTimeout(() => {
+        setShowingInFinder(false);
+        onClose();
+      }, 1500);
+
+    } catch (error) {
+      console.error('操作失败:', error);
+      setShowingInFinder(false);
+    }
+  };
 
   // 导出PNG拼图
   const handleExportPNG = async () => {
@@ -101,6 +191,22 @@ function PhotoContextMenu({
           <span className="text-gray-400 font-bold text-lg">○</span>
           <span className="text-gray-500">取消标签</span>
           <span className="ml-auto text-xs text-gray-400">X</span>
+        </button>
+
+        {/* 文件操作 */}
+        <div className="border-t border-gray-200 my-1"></div>
+        <button
+          onClick={handleShowInFinder}
+          className="w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors flex items-center gap-3 relative"
+          disabled={!currentPhoto}
+        >
+          <span className="text-blue-600 font-bold text-lg">📁</span>
+          <span className="text-gray-700">在访达中显示</span>
+          {showingInFinder && (
+            <div className="absolute inset-0 bg-blue-50 flex items-center justify-center rounded">
+              <span className="text-blue-600 text-sm font-medium">✓ 请查看下载栏</span>
+            </div>
+          )}
         </button>
 
         {/* 对比模式专属功能 */}

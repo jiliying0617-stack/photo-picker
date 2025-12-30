@@ -9,7 +9,6 @@ const Toolbar = memo(function Toolbar({ toast }) {
   const clearPhotos = usePhotoStore((state) => state.clearPhotos);
   const clearCategories = usePhotoStore((state) => state.clearCategories);
   const photos = usePhotoStore((state) => state.photos);
-  const categories = usePhotoStore((state) => state.categories);
   const groupBrowseMode = usePhotoStore((state) => state.groupBrowseMode);
   const setGroupBrowseMode = usePhotoStore((state) => state.setGroupBrowseMode);
 

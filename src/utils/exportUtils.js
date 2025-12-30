@@ -22,8 +22,7 @@ export async function exportGroupAsPNG(photos, groupName = '对比组') {
       realPhotos.map(photo => loadImage(photo.file))
     );
 
-    // 计算拼图布局
-    const cols = realPhotos.length; // 横向排列
+    // 计算拼图布局（横向排列）
     const maxHeight = Math.max(...images.map(img => img.height));
     const totalWidth = images.reduce((sum, img) => sum + img.width, 0);
 

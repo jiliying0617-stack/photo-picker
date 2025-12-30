@@ -28,7 +28,6 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   setCurrentPreviewGroupIndex,
   openContextMenu,
   setPhotoRef,
-  allPhotos, // 所有照片（用于URL管理）
   onGridRefReady, // 新增：将gridRef暴露给父组件
 }) {
   const containerRef = useRef(null);
@@ -73,40 +72,6 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   const columnWidth = Math.floor(availableWidth / columns);
   const rowHeight = columnWidth; // 保持正方形比例
 
-  // 占位符点击处理
-  const handlePlaceholderClick = useCallback((e, placeholderId) => {
-    if (e.shiftKey || e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      setSelectedPhotos(prev =>
-        prev.includes(placeholderId)
-          ? prev.filter(id => id !== placeholderId)
-          : [...prev, placeholderId]
-      );
-    }
-  }, [setSelectedPhotos]);
-
-  // 占位符双击处理
-  const handlePlaceholderDoubleClick = useCallback((idx) => {
-    // 保存当前组索引（对比模式下）
-    if (isCompareMode) {
-      const groupIndex = Math.floor(idx / columns);
-      setCurrentPreviewGroupIndex(groupIndex);
-    }
-
-    if (selectedPhotos.length > 0) {
-      // 如果有框选的图片，预览所有框选的
-      const photosToPreview = photos.filter((p, i) =>
-        p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
-      );
-      openPreview(photosToPreview);
-    } else {
-      // 否则预览当前组（对比模式下通常是一行）
-      const rowStartIdx = Math.floor(idx / columns) * columns;
-      const rowPhotos = photos.slice(rowStartIdx, rowStartIdx + columns);
-      openPreview(rowPhotos);
-    }
-  }, [isCompareMode, selectedPhotos, photos, columns, openPreview, setCurrentPreviewGroupIndex]);
-
   // 照片点击处理
   const handlePhotoClick = useCallback((e, photo) => {
     if (e.shiftKey || e.ctrlKey || e.metaKey) {
@@ -150,38 +115,9 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
 
     const photo = photos[index];
 
-    // 渲染占位符
+    // 跳过无效照片(null/undefined) - 已在 useCompareMode 中过滤,此处为防御性检查
     if (!photo) {
-      const placeholderId = `placeholder-${index}`;
-      const isPlaceholderSelected = selectedPhotos.includes(placeholderId);
-
-      return (
-        <div style={style}>
-          <div style={{ padding: gap / 2 }}>
-            <div
-              key={placeholderId}
-              className={`photo-item neu-card rounded-2xl overflow-hidden cursor-pointer transition-all ${
-                isPlaceholderSelected ? 'ring-4 ring-blue-500' : ''
-              }`}
-              onClick={(e) => handlePlaceholderClick(e, placeholderId)}
-              onDoubleClick={() => handlePlaceholderDoubleClick(index, placeholderId)}
-            >
-              {isPlaceholderSelected && (
-                <div className="absolute top-2 left-2 bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10">
-                  ✓
-                </div>
-              )}
-              <div className="aspect-square flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 neu-concave relative">
-                <div className="text-6xl mb-3 opacity-20">📷</div>
-                <div className="text-gray-400 text-xs font-medium">此文件夹无此图片</div>
-                <div className="absolute bottom-2 text-gray-300 text-[10px]">
-                  点击选择 · 双击预览
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
+      return null;
     }
 
     // 渲染真实照片
@@ -302,8 +238,6 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
     isCompareMode,
     gap,
     setPhotoRef,
-    handlePlaceholderClick,
-    handlePlaceholderDoubleClick,
     handlePhotoClick,
     handlePhotoDoubleClick,
     handleContextMenu,
@@ -312,7 +246,7 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   ]);
 
   // 滚动回调（保留用于未来扩展，当前未使用）
-  const handleScroll = useCallback(({ scrollTop }) => {
+  const handleScroll = useCallback(({ scrollTop: _scrollTop }) => {
     // 可以在这里添加滚动追踪逻辑
     // 例如：追踪可见区域、预加载等
   }, []);

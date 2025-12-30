@@ -78,11 +78,11 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   }, [pan]);
 
   // 初始化最后查看的照片ID为第一张真实照片
+  // 这是一个合法的副作用：当照片列表变化时，需要重置追踪的照片ID用于关闭时的回调
   useEffect(() => {
-    if (firstRealPhoto && !lastViewedPhotoId) {
-      setLastViewedPhotoId(firstRealPhoto.id);
-    }
-  }, [firstRealPhoto, lastViewedPhotoId]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLastViewedPhotoId(firstRealPhoto?.id || null);
+  }, [firstRealPhoto]);
 
   // 切换到下一组（空格键：第一张图不动，其余图片各自切换到所属文件夹的下一张）
   // 重要：第一张图片保持不变，其余图片在各自文件夹中独立前进
@@ -176,6 +176,68 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       setCategoryBatch(photoIds, category); // 🔥 批量设置，只触发一次同步
     }
   }, [photos, setCategoryBatch]);
+
+  // 在访达中显示文件
+  const handleShowInFinder = useCallback(async (photoId) => {
+    const photo = photos.find(p => p && p.id === photoId);
+    if (!photo) return;
+
+    try {
+      // 优先方案: 使用浏览器扩展（真正的系统级打开）
+      if (window.showInFinder && photo.path) {
+        try {
+          await window.showInFinder(photo.path);
+          console.log('✅ 已通过扩展在访达中打开:', photo.path);
+          setContextMenu(null);
+          return;
+        } catch (extError) {
+          console.warn('扩展调用失败，回退到下载方案:', extError.message);
+        }
+      }
+
+      // 回退方案1: 如果有 fileHandle，使用它来触发下载
+      if (photo.fileHandle) {
+        const file = await photo.fileHandle.getFile();
+        const url = URL.createObjectURL(file);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+
+        console.log('📁 已触发下载，请在浏览器下载栏点击"在访达中显示"');
+        setContextMenu(null);
+      }
+      // 回退方案2: 如果有 file 对象
+      else if (photo.file) {
+        const url = URL.createObjectURL(photo.file);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = photo.file.name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+
+        console.log('📁 已触发下载，请在浏览器下载栏点击"在访达中显示"');
+        setContextMenu(null);
+      }
+    } catch (error) {
+      console.error('操作失败:', error);
+    }
+  }, [photos]);
 
   // 复制文件路径到剪贴板
   const handleCopyPath = useCallback(async (photoId) => {
@@ -699,6 +761,16 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
               <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">X</span>
             </button>
             <div className="h-px bg-gray-700 my-1"></div>
+            <button
+              onClick={() => {
+                handleShowInFinder(contextMenu.photoId);
+              }}
+              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
+            >
+              <span className="text-blue-400 font-bold text-xl">📁</span>
+              <span className="text-white font-medium">在访达中显示</span>
+              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">查看下载栏</span>
+            </button>
             <button
               onClick={() => {
                 handleCopyPath(contextMenu.photoId);

@@ -99,7 +99,8 @@ export function useCompareMode(selectedFolders, filteredPhotos, folderMap, displ
 
     // 对比模式：使用对齐后的照片并分页，过滤掉占位符（主面板不显示占位符）
     const slicedPhotos = alignedPhotos.slice(0, displayCount * compareColumns);
-    return slicedPhotos.filter(p => p !== null);
+    // 增强过滤: 确保过滤掉 null、undefined 和无效对象
+    return slicedPhotos.filter(p => p !== null && p !== undefined && p.id);
   }, [isCompareMode, filteredPhotos, alignedPhotos, displayCount, compareColumns]);
 
   // 对比模式下追踪当前照片（使用selectedPhotoId）

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Picker - Finder Integration</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 400px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .version {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .status {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .status-item:last-child {
+      border-bottom: none;
+    }
+
+    .status-label {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .status-value {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .status-value.success {
+      color: #4ade80;
+    }
+
+    .status-value.error {
+      color: #f87171;
+    }
+
+    .instructions {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+
+    .instructions h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .instructions ol {
+      padding-left: 20px;
+      font-size: 13px;
+      line-height: 1.6;
+      opacity: 0.9;
+    }
+
+    .instructions li {
+      margin-bottom: 5px;
+    }
+
+    .instructions code {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+    }
+
+    .button {
+      width: 100%;
+      padding: 12px;
+      background: white;
+      color: #667eea;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .button:active {
+      transform: translateY(0);
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      opacity: 0.6;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="icon">📁</div>
+    <h1>Photo Picker</h1>
+    <div class="version">Finder Integration v1.0.0</div>
+  </div>
+
+  <div class="status">
+    <div class="status-item">
+      <span class="status-label">扩展状态</span>
+      <span class="status-value success" id="extension-status">✓ 已安装</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">Native Host</span>
+      <span class="status-value" id="host-status">检测中...</span>
+    </div>
+  </div>
+
+  <div class="instructions">
+    <h2>📖 安装说明</h2>
+    <ol>
+      <li>运行安装脚本: <code>bash install-native-host.sh</code></li>
+      <li>重启浏览器</li>
+      <li>在 Photo Picker 中右键点击照片</li>
+      <li>选择"在访达中显示"即可</li>
+    </ol>
+  </div>
+
+  <button class="button" id="test-button">测试 Native Host</button>
+
+  <div class="footer">
+    Powered by Chrome Extension API + Native Messaging
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

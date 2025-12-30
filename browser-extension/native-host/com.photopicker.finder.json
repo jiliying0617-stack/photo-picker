@@ -1,0 +1,9 @@
+{
+  "name": "com.photopicker.finder",
+  "description": "Photo Picker Finder Integration Native Host",
+  "path": "/Users/jiliying/Desktop/photo-picker/browser-extension/native-host/host.py",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://EXTENSION_ID_PLACEHOLDER/"
+  ]
+}

@@ -15,49 +15,11 @@ const PhotoGridItem = memo(function PhotoGridItem({
   onPhotoClick,
   onPhotoDoubleClick,
   onPhotoContextMenu,
-  onPlaceholderClick,
-  onPlaceholderDoubleClick,
   setCategory,
 }) {
-  // 处理占位符
+  // 跳过无效照片(null/undefined) - 已在 useCompareMode 中过滤,此处为防御性检查
   if (!photo) {
-    const placeholderId = `placeholder-${index}`;
-    const isPlaceholderSelected = selectedPhotos.includes(placeholderId);
-
-    const handlePlaceholderClick = (e) => {
-      if (onPlaceholderClick) {
-        onPlaceholderClick(e, placeholderId, index);
-      }
-    };
-
-    const handlePlaceholderDoubleClick = () => {
-      if (onPlaceholderDoubleClick) {
-        onPlaceholderDoubleClick(index);
-      }
-    };
-
-    return (
-      <div
-        className={`photo-item neu-card rounded-2xl overflow-hidden cursor-pointer transition-all ${
-          isPlaceholderSelected ? 'ring-4 ring-blue-500' : ''
-        }`}
-        onClick={handlePlaceholderClick}
-        onDoubleClick={handlePlaceholderDoubleClick}
-      >
-        {isPlaceholderSelected && (
-          <div className="absolute top-2 left-2 bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10">
-            ✓
-          </div>
-        )}
-        <div className="aspect-square flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 neu-concave relative">
-          <div className="text-6xl mb-3 opacity-20">📷</div>
-          <div className="text-gray-400 text-xs font-medium">此文件夹无此图片</div>
-          <div className="absolute bottom-2 text-gray-300 text-[10px]">
-            点击选择 · 双击预览
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // 处理真实照片

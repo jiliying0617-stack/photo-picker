@@ -105,26 +105,14 @@ function App() {
             behavior: 'smooth',
           });
 
-          // 滚动后，尝试选中该组的第一张真实照片（提升用户体验）
+          // 滚动后，尝试选中该组的第一张照片（提升用户体验）
           setTimeout(() => {
             const photoIndex = groupIndex * compareColumns;
-            const photo = displayPhotos[photoIndex];
+            const firstPhoto = displayPhotos[photoIndex];
 
-            // 找到该组的第一张真实照片
-            let firstRealPhoto = photo;
-            if (!firstRealPhoto || !firstRealPhoto.id) {
-              // 如果第一个是占位符，找该行的第一张真实照片
-              for (let i = 0; i < compareColumns; i++) {
-                const p = displayPhotos[photoIndex + i];
-                if (p && p.id) {
-                  firstRealPhoto = p;
-                  break;
-                }
-              }
-            }
-
-            if (firstRealPhoto && firstRealPhoto.id) {
-              setSelectedPhotoId(firstRealPhoto.id);
+            // displayPhotos 已过滤 null，直接使用第一张照片
+            if (firstPhoto && firstPhoto.id) {
+              setSelectedPhotoId(firstPhoto.id);
             }
           }, 300); // 等待滚动动画完成
         } catch (error) {
@@ -238,12 +226,12 @@ function App() {
           <SelectionToolbar
             selectedPhotos={selectedPhotos}
             onPreview={() => {
-              const photosToPreview = displayPhotos.filter((p, i) =>
-                p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
+              const photosToPreview = displayPhotos.filter(p =>
+                p && selectedPhotos.includes(p.id)
               );
               if (isCompareMode && selectedPhotos.length > 0) {
-                const firstSelectedIndex = displayPhotos.findIndex((p, i) =>
-                  p ? selectedPhotos.includes(p.id) : selectedPhotos.includes(`placeholder-${i}`)
+                const firstSelectedIndex = displayPhotos.findIndex(p =>
+                  p && selectedPhotos.includes(p.id)
                 );
                 if (firstSelectedIndex >= 0) {
                   const groupIndex = Math.floor(firstSelectedIndex / compareColumns);
@@ -274,6 +262,7 @@ function App() {
         isCompareMode={isCompareMode}
         displayPhotos={displayPhotos}
         compareColumns={compareColumns}
+        allPhotos={photos}
       />
 
       {/* 大图预览 */}
