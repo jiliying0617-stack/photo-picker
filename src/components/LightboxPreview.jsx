@@ -182,6 +182,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   }, [hoveredPhotoId, setCategory, handleCategoryAll]);
 
   // 旋转图片：悬停在图片上时才能旋转
+  // 对比模式下，旋转任何一张图片都会同步旋转所有图片，保持角度一致
   const handleRotate = useCallback((direction) => {
     if (!hoveredPhotoId) return; // 只有悬停在图片上时才旋转
 
@@ -191,12 +192,32 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         ? (currentRotation + 90) % 360
         : (currentRotation - 90 + 360) % 360;
 
+      // 对比模式：旋转任何一张图片时，同步所有图片的旋转角度
+      const isCompareMode = photosWithUrls.photos.length > 1;
+
+      if (isCompareMode) {
+        // 计算旋转增量
+        const rotationDelta = direction === 'clockwise' ? 90 : -90;
+
+        // 同步旋转所有图片
+        const updates = {};
+        photosWithUrls.photos.forEach(photo => {
+          if (photo && photo.id) {
+            const currentPhotoRotation = prev[photo.id] || 0;
+            const newPhotoRotation = (currentPhotoRotation + rotationDelta + 360) % 360;
+            updates[photo.id] = newPhotoRotation;
+          }
+        });
+        return { ...prev, ...updates };
+      }
+
+      // 普通模式：只旋转当前图片
       return {
         ...prev,
         [hoveredPhotoId]: newRotation
       };
     });
-  }, [hoveredPhotoId]);
+  }, [hoveredPhotoId, photosWithUrls.photos]);
 
   // 在访达中显示文件
   const handleShowInFinder = useCallback(async (photoId) => {
