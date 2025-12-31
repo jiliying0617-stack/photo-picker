@@ -664,66 +664,73 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
                 {/* 图片容器 - 可缩放和平移 */}
                 <div className="w-full h-full flex items-center justify-center relative">
-                  {/* 相邻循环对比模式 - 叠图显示 */}
-                  {isCompareMode && nextPhoto ? (
-                    <div className="w-full h-full flex items-center justify-center relative">
-                      {/* 底层：当前图片 */}
+                  {/* 正方形容器确保旋转后尺寸一致 */}
+                  <div className="relative" style={{
+                    width: 'min(100%, 100vh)',
+                    height: 'min(100%, 100vh)',
+                    aspectRatio: '1/1'
+                  }}>
+                    {/* 相邻循环对比模式 - 叠图显示 */}
+                    {isCompareMode && nextPhoto ? (
+                      <div className="w-full h-full flex items-center justify-center relative">
+                        {/* 底层：当前图片 */}
+                        <img
+                          ref={el => imagesRef.current[idx] = el}
+                          src={photo.thumbnailUrl}
+                          alt={photo.name}
+                          className="absolute object-contain"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                            transformOrigin: 'center center',
+                            willChange: isPanning ? 'transform' : 'auto',
+                            opacity: 1,
+                            zIndex: 1,
+                          }}
+                          draggable={false}
+                        />
+
+                        {/* 顶层：下一张图片（叠加） */}
+                        <img
+                          src={nextPhoto.thumbnailUrl}
+                          alt={nextPhoto.name}
+                          className="absolute object-contain"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            transform: `rotate(${rotations[nextPhoto.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                            transformOrigin: 'center center',
+                            willChange: isPanning ? 'transform' : 'auto',
+                            opacity: 1,
+                            zIndex: 2,
+                          }}
+                          draggable={false}
+                        />
+
+                        {/* 对比标签 */}
+                        <div className="absolute top-2 left-2 bg-purple-600/90 text-white px-2 py-1 rounded text-xs font-bold z-10">
+                          第 {currentRealIdx + 1} 张 ⇄ 第 {nextRealIdx + 1} 张
+                        </div>
+                      </div>
+                    ) : (
+                      /* 正常显示单张图片 */
                       <img
                         ref={el => imagesRef.current[idx] = el}
                         src={photo.thumbnailUrl}
                         alt={photo.name}
-                        className="absolute object-cover"
+                        className="object-contain"
                         style={{
                           width: '100%',
                           height: '100%',
                           transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                           transformOrigin: 'center center',
                           willChange: isPanning ? 'transform' : 'auto',
-                          opacity: 1,
-                          zIndex: 1,
                         }}
                         draggable={false}
                       />
-
-                      {/* 顶层：下一张图片（叠加） */}
-                      <img
-                        src={nextPhoto.thumbnailUrl}
-                        alt={nextPhoto.name}
-                        className="absolute object-cover"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          transform: `rotate(${rotations[nextPhoto.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
-                          transformOrigin: 'center center',
-                          willChange: isPanning ? 'transform' : 'auto',
-                          opacity: 1,
-                          zIndex: 2,
-                        }}
-                        draggable={false}
-                      />
-
-                      {/* 对比标签 */}
-                      <div className="absolute top-2 left-2 bg-purple-600/90 text-white px-2 py-1 rounded text-xs font-bold z-10">
-                        第 {currentRealIdx + 1} 张 ⇄ 第 {nextRealIdx + 1} 张
-                      </div>
-                    </div>
-                  ) : (
-                    /* 正常显示单张图片 */
-                    <img
-                      ref={el => imagesRef.current[idx] = el}
-                      src={photo.thumbnailUrl}
-                      alt={photo.name}
-                      className="object-cover"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
-                        transformOrigin: 'center center',
-                        willChange: isPanning ? 'transform' : 'auto',
-                      }}
-                      draggable={false}
-                    />
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 {/* 文件名 */}
