@@ -13,6 +13,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   const [copyPathNotification, setCopyPathNotification] = useState(false); // 复制路径成功提示
   const [hoveredPhotoId, setHoveredPhotoId] = useState(null); // 追踪鼠标悬停的图片ID
   const [rotations, setRotations] = useState({}); // 存储每张图片的旋转角度 { photoId: degree }
+  const [imageDimensions, setImageDimensions] = useState({}); // 存储每张图片的原始尺寸 { photoId: { width, height } }
   const setCategory = usePhotoStore((state) => state.setCategory);
   const setCategoryBatch = usePhotoStore((state) => state.setCategoryBatch); // 🔥 使用批量 API
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
@@ -59,6 +60,71 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     });
     return map;
   }, [allPhotos]);
+
+  // 🎯 自动旋转逻辑：根据第一张图的方向自动调整其他图片
+  // 计算每张图片需要自动旋转的角度，使所有图片方向与第一张图一致
+  const autoRotations = useMemo(() => {
+    const rotations = {};
+
+    // 找到第一张真实照片
+    const firstPhoto = photosWithUrls.photos.find(p => p);
+    if (!firstPhoto || !imageDimensions[firstPhoto.id]) {
+      return rotations; // 尺寸未加载，不做旋转
+    }
+
+    const firstDim = imageDimensions[firstPhoto.id];
+    const firstIsVertical = firstDim.height > firstDim.width; // 第一张图是竖构图
+
+    // 遍历所有照片，计算需要的自动旋转
+    photosWithUrls.photos.forEach(photo => {
+      if (!photo || !imageDimensions[photo.id]) return;
+
+      const dim = imageDimensions[photo.id];
+      const isVertical = dim.height > dim.width;
+
+      // 如果当前图片方向与第一张图不同，需要旋转90度
+      if (isVertical !== firstIsVertical) {
+        rotations[photo.id] = 90; // 自动旋转90度以匹配第一张图的方向
+      } else {
+        rotations[photo.id] = 0; // 方向一致，不需要自动旋转
+      }
+    });
+
+    return rotations;
+  }, [photosWithUrls.photos, imageDimensions]);
+
+  // 计算第一张图的容器尺寸（基于第一张图的宽高比）
+  const containerStyle = useMemo(() => {
+    const firstPhoto = photosWithUrls.photos.find(p => p);
+    if (!firstPhoto || !imageDimensions[firstPhoto.id]) {
+      // 默认正方形
+      return {
+        width: 'min(90%, 90vh)',
+        height: 'min(90%, 90vh)',
+        aspectRatio: '1/1'
+      };
+    }
+
+    const dim = imageDimensions[firstPhoto.id];
+    const aspectRatio = dim.width / dim.height;
+
+    // 根据宽高比动态调整容器
+    if (aspectRatio > 1) {
+      // 横图：宽度固定，高度按比例
+      return {
+        width: 'min(90%, 90vh)',
+        height: 'auto',
+        aspectRatio: `${dim.width}/${dim.height}`
+      };
+    } else {
+      // 竖图：高度固定，宽度按比例
+      return {
+        width: 'auto',
+        height: 'min(90%, 90vh)',
+        aspectRatio: `${dim.width}/${dim.height}`
+      };
+    }
+  }, [photosWithUrls.photos, imageDimensions]);
 
   // 计算当前组在所有图片中的位置
   // 重要：allPhotos 已过滤占位符，按主面板顺序排列
@@ -212,6 +278,18 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       };
     });
   }, [hoveredPhotoId]);
+
+  // 图片加载完成时记录原始尺寸
+  const handleImageLoad = useCallback((photoId, event) => {
+    const img = event.target;
+    setImageDimensions(prev => ({
+      ...prev,
+      [photoId]: {
+        width: img.naturalWidth,
+        height: img.naturalHeight
+      }
+    }));
+  }, []);
 
   // 在访达中显示文件
   const handleShowInFinder = useCallback(async (photoId) => {
@@ -664,12 +742,8 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
                 {/* 图片容器 - 可缩放和平移 */}
                 <div className="w-full h-full flex items-center justify-center relative">
-                  {/* 正方形容器 + cover 确保尺寸完全一致，可通过滚轮缩放查看完整图片 */}
-                  <div className="relative overflow-hidden" style={{
-                    width: 'min(90%, 90vh)',
-                    height: 'min(90%, 90vh)',
-                    aspectRatio: '1/1'
-                  }}>
+                  {/* 动态容器：根据第一张图的宽高比自动调整，使用 contain 显示完整原图 */}
+                  <div className="relative overflow-hidden" style={containerStyle}>
                     {/* 相邻循环对比模式 - 叠图显示 */}
                     {isCompareMode && nextPhoto ? (
                       <div className="w-full h-full flex items-center justify-center relative">
@@ -678,11 +752,12 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                           ref={el => imagesRef.current[idx] = el}
                           src={photo.thumbnailUrl}
                           alt={photo.name}
-                          className="absolute object-cover"
+                          className="absolute object-contain"
+                          onLoad={(e) => handleImageLoad(photo.id, e)}
                           style={{
                             width: '100%',
                             height: '100%',
-                            transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                            transform: `rotate(${(autoRotations[photo.id] || 0) + (rotations[photo.id] || 0)}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                             transformOrigin: 'center center',
                             willChange: isPanning ? 'transform' : 'auto',
                             zIndex: 1,
@@ -694,11 +769,12 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         <img
                           src={nextPhoto.thumbnailUrl}
                           alt={nextPhoto.name}
-                          className="absolute object-cover"
+                          className="absolute object-contain"
+                          onLoad={(e) => handleImageLoad(nextPhoto.id, e)}
                           style={{
                             width: '100%',
                             height: '100%',
-                            transform: `rotate(${rotations[nextPhoto.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                            transform: `rotate(${(autoRotations[nextPhoto.id] || 0) + (rotations[nextPhoto.id] || 0)}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                             transformOrigin: 'center center',
                             willChange: isPanning ? 'transform' : 'auto',
                             zIndex: 2,
@@ -717,11 +793,12 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         ref={el => imagesRef.current[idx] = el}
                         src={photo.thumbnailUrl}
                         alt={photo.name}
-                        className="object-cover"
+                        className="object-contain"
+                        onLoad={(e) => handleImageLoad(photo.id, e)}
                         style={{
                           width: '100%',
                           height: '100%',
-                          transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                          transform: `rotate(${(autoRotations[photo.id] || 0) + (rotations[photo.id] || 0)}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                           transformOrigin: 'center center',
                           willChange: isPanning ? 'transform' : 'auto',
                         }}
