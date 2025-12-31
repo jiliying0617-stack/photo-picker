@@ -22,29 +22,45 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   // 缓存最近使用的 500 张图片的 URLs（支持快速切换 125 组，每组 4 张）
   const getPhotoUrl = useLRUObjectUrls(500);
 
-  // 按需创建照片 URL（LRU 缓存自动管理内存）
-  const photosWithUrls = useMemo(() => {
-    const result = photos.map(photo => {
-      // 处理占位符 (null)
-      if (!photo) {
-        return null;
+  // 异步加载照片 URLs (处理新的 fileHandle 优化)
+  const [photosWithUrls, setPhotosWithUrls] = useState({ photos: [] });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPhotos = async () => {
+      const result = await Promise.all(
+        photos.map(async (photo) => {
+          // 处理占位符 (null)
+          if (!photo) {
+            return null;
+          }
+
+          // 已有 thumbnailUrl，直接使用
+          if (photo.thumbnailUrl) {
+            return photo;
+          }
+
+          // 🔥 优先使用 fileHandle (性能优化路径)
+          if (photo.fileHandle || photo.file) {
+            const url = await getPhotoUrl(photo);
+            return url ? { ...photo, thumbnailUrl: url } : photo;
+          }
+
+          return photo;
+        })
+      );
+
+      if (!cancelled) {
+        setPhotosWithUrls({ photos: result });
       }
+    };
 
-      // 已有 thumbnailUrl，直接使用
-      if (photo.thumbnailUrl) {
-        return photo;
-      }
+    loadPhotos();
 
-      // 从 LRU 缓存获取或创建 URL
-      if (photo.file) {
-        const url = getPhotoUrl(photo);
-        return url ? { ...photo, thumbnailUrl: url } : photo;
-      }
-
-      return photo;
-    });
-
-    return { photos: result };
+    return () => {
+      cancelled = true;
+    };
   }, [photos, getPhotoUrl]);
 
   // 🔥 性能优化：预计算照片ID到索引的映射，避免每次 findIndex
