@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import usePhotoStore from './store/usePhotoStore';
 import Toolbar from './components/Toolbar';
 import StatusBar from './components/StatusBar';
@@ -82,55 +82,109 @@ function App() {
     previewPhotos, // 🔥 传递 previewPhotos，Lightbox 打开时禁用全局处理器
   });
 
-  // 计算总组数 - 在对比模式或检索组模式下启用
+  // 计算总组数 - 基于第一个文件夹的图片数量
   const enableGroupNavigation = isCompareMode || groupBrowseMode;
-  const totalGroups = enableGroupNavigation
-    ? Math.ceil(displayPhotos.length / compareColumns)
-    : 0;
+  const totalGroups = useMemo(() => {
+    if (!enableGroupNavigation) return 0;
 
-  // 滚动到指定组（使用虚拟网格的 scrollToCell API）
+    // 获取第一个文件夹的图片数量
+    const folderPaths = Object.keys(folderMap).sort();
+    if (folderPaths.length === 0) return 0;
+
+    const firstFolderPath = folderPaths[0];
+    const firstFolderPhotos = folderMap[firstFolderPath] || [];
+    return firstFolderPhotos.length;
+  }, [enableGroupNavigation, folderMap]);
+
+  // 自动检索组跳转：根据输入的组号，找到第一个文件夹的第N张图片，并跳转到该图片在主列表中的位置
   const scrollToGroup = useCallback(
-    (groupIndex) => {
-      if (!enableGroupNavigation || groupIndex < 0 || groupIndex >= totalGroups) return;
+    (photoNumber) => {
+      // photoNumber 是用户输入的图片序号(从0开始)
 
-      devLog('🎯 跳转到组:', groupIndex, '/', totalGroups);
+      if (!enableGroupNavigation) {
+        console.warn('⚠️ 组导航未启用');
+        return;
+      }
 
-      // 使用虚拟网格的 scrollToCell API 直接滚动到指定行
-      if (virtualGridRef) {
-        const rowIndex = groupIndex;
-        try {
-          virtualGridRef.scrollToCell({
-            rowIndex,
-            columnIndex: 0,
-            rowAlign: 'start',
-            behavior: 'smooth',
-          });
+      // 1. 获取第一个文件夹
+      const folderPaths = Object.keys(folderMap).sort();
+      if (folderPaths.length === 0) {
+        console.error('❌ 没有找到文件夹');
+        return;
+      }
 
-          // 滚动后，尝试选中该组的第一张照片（提升用户体验）
-          setTimeout(() => {
-            const photoIndex = groupIndex * compareColumns;
-            const firstPhoto = displayPhotos[photoIndex];
+      const firstFolderPath = folderPaths[0];
+      const firstFolderPhotos = folderMap[firstFolderPath] || [];
 
-            // displayPhotos 已过滤 null，直接使用第一张照片
-            if (firstPhoto && firstPhoto.id) {
-              setSelectedPhotoId(firstPhoto.id);
-            }
-          }, 300); // 等待滚动动画完成
-        } catch (error) {
-          console.warn('滚动到组失败:', error);
-          // 回退：尝试使用 refs（仅当照片已渲染时有效）
-          const photoIndex = groupIndex * compareColumns;
-          const photo = displayPhotos[photoIndex];
-          if (photo && photo.id) {
-            scrollToPhoto(photo.id, {
-              behavior: 'smooth',
-              block: 'start',
-            });
-          }
+      devLog('📁 第一个文件夹:', firstFolderPath, '共', firstFolderPhotos.length, '张图片');
+
+      // 2. 检查图片序号是否有效
+      if (photoNumber < 0 || photoNumber >= firstFolderPhotos.length) {
+        console.warn('⚠️ 图片序号越界:', photoNumber + 1, '/', firstFolderPhotos.length);
+        alert(`第一个文件夹只有 ${firstFolderPhotos.length} 张图片，请输入 1-${firstFolderPhotos.length} 之间的数字`);
+        return;
+      }
+
+      // 3. 获取第N张图片
+      const targetPhoto = firstFolderPhotos[photoNumber];
+      if (!targetPhoto) {
+        console.error('❌ 未找到目标图片');
+        return;
+      }
+
+      devLog('🎯 目标图片:', targetPhoto.name, '(第一个文件夹的第', photoNumber + 1, '张)');
+
+      // 4. 在 displayPhotos 中找到该图片的索引
+      const photoIndexInDisplay = displayPhotos.findIndex(p => p && p.id === targetPhoto.id);
+      if (photoIndexInDisplay < 0) {
+        console.error('❌ 目标图片不在当前显示列表中(可能被过滤)');
+        alert(`图片 "${targetPhoto.name}" 不在当前显示列表中，可能被分类过滤隐藏了`);
+        return;
+      }
+
+      devLog('📍 图片在主列表中的位置:', photoIndexInDisplay + 1, '/', displayPhotos.length);
+
+      // 5. 滚动到该图片
+      if (!virtualGridRef) {
+        console.warn('⚠️ virtualGridRef 未初始化，稍后重试...');
+        setTimeout(() => scrollToGroup(photoNumber), 200);
+        return;
+      }
+
+      try {
+        if (typeof virtualGridRef.scrollToCell !== 'function') {
+          console.error('❌ scrollToCell 方法不存在');
+          return;
         }
+
+        const rowIndex = Math.floor(photoIndexInDisplay / compareColumns);
+        const columnIndex = photoIndexInDisplay % compareColumns;
+
+        virtualGridRef.scrollToCell({
+          rowIndex,
+          columnIndex,
+          rowAlign: 'center',
+          columnAlign: 'center',
+          behavior: 'smooth',
+        });
+
+        devLog('✓ 滚动到行', rowIndex, '列', columnIndex);
+
+        // 选中该图片
+        setTimeout(() => {
+          setSelectedPhotoId(targetPhoto.id);
+          devLog('✓ 已选中图片:', targetPhoto.name);
+        }, 300);
+      } catch (error) {
+        console.error('❌ 滚动失败:', error);
+        // 回退方案
+        scrollToPhoto(targetPhoto.id, {
+          behavior: 'smooth',
+          block: 'center',
+        });
       }
     },
-    [enableGroupNavigation, totalGroups, compareColumns, displayPhotos, scrollToPhoto, virtualGridRef, setSelectedPhotoId]
+    [enableGroupNavigation, folderMap, displayPhotos, compareColumns, virtualGridRef, setSelectedPhotoId, scrollToPhoto]
   );
 
 

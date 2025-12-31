@@ -252,11 +252,25 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
   }, []);
 
   // 暴露gridRef给父组件（用于跳转功能）
+  // 需要在每次渲染时检查,因为Grid组件可能异步设置ref
   useEffect(() => {
     if (gridRef.current && onGridRefReady) {
       onGridRefReady(gridRef.current);
     }
-  }, [onGridRefReady]);
+  });
+
+  // 备用: 监听columns变化,确保Grid重新渲染后ref被更新
+  useEffect(() => {
+    if (gridRef.current && onGridRefReady) {
+      // Grid重新渲染后,再次暴露ref
+      const timer = setTimeout(() => {
+        if (gridRef.current) {
+          onGridRefReady(gridRef.current);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [columns, onGridRefReady]);
 
   // 容器未初始化时显示占位
   if (containerSize.width === 0 || containerSize.height === 0) {
