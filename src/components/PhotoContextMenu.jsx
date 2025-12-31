@@ -8,9 +8,11 @@ function PhotoContextMenu({
   isCompareMode = false,
   displayPhotos = [],
   compareColumns = 1,
-  allPhotos = [] // 新增：所有照片列表
+  allPhotos = [], // 新增：所有照片列表
+  onDelete // 新增：删除回调
 }) {
   const [showingInFinder, setShowingInFinder] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   if (!contextMenu) return null;
 
@@ -137,6 +139,34 @@ function PhotoContextMenu({
     onClose();
   };
 
+  // 删除照片
+  const handleDelete = async () => {
+    if (!onDelete || !currentPhoto) return;
+
+    // 确认删除
+    const confirmDelete = window.confirm(
+      `确定要删除 "${currentPhoto.name}" 吗？\n\n此操作将同时从列表和文件夹中删除该文件，无法撤销！`
+    );
+
+    if (!confirmDelete) return;
+
+    setDeleting(true);
+    try {
+      const result = await onDelete(contextMenu.photoId);
+      if (result.success) {
+        console.log('✓ 删除成功');
+        onClose();
+      } else {
+        alert(`删除失败: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('删除失败:', error);
+      alert(`删除失败: ${error.message}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div
       className="fixed z-50 neu-card rounded-xl overflow-hidden shadow-2xl"
@@ -205,6 +235,19 @@ function PhotoContextMenu({
           {showingInFinder && (
             <div className="absolute inset-0 bg-blue-50 flex items-center justify-center rounded">
               <span className="text-blue-600 text-sm font-medium">✓ 请查看下载栏</span>
+            </div>
+          )}
+        </button>
+        <button
+          onClick={handleDelete}
+          className="w-full px-4 py-2 text-left hover:bg-red-50 transition-colors flex items-center gap-3 relative"
+          disabled={!currentPhoto || deleting}
+        >
+          <span className="text-red-600 font-bold text-lg">🗑️</span>
+          <span className="text-gray-700">删除图片</span>
+          {deleting && (
+            <div className="absolute inset-0 bg-red-50 flex items-center justify-center rounded">
+              <span className="text-red-600 text-sm font-medium">删除中...</span>
             </div>
           )}
         </button>

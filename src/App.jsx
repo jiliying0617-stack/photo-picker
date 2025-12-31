@@ -33,6 +33,7 @@ function App() {
   const selectedPhotoId = usePhotoStore((state) => state.selectedPhotoId);
   const setSelectedPhotoId = usePhotoStore((state) => state.setSelectedPhotoId);
   const groupBrowseMode = usePhotoStore((state) => state.groupBrowseMode);
+  const deletePhoto = usePhotoStore((state) => state.deletePhoto);
 
   // 本地 UI 状态
   const [filter, setFilter] = useState({ category: null, folders: [] });
@@ -263,6 +264,7 @@ function App() {
         displayPhotos={displayPhotos}
         compareColumns={compareColumns}
         allPhotos={photos}
+        onDelete={deletePhoto}
       />
 
       {/* 大图预览 */}

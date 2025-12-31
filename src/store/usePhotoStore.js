@@ -281,6 +281,56 @@ const usePhotoStore = create((set, get) => ({
   },
 
   /**
+   * 删除单张照片（从列表和文件系统）
+   * @param {string} photoId - 照片 ID
+   */
+  deletePhoto: async (photoId) => {
+    const photos = get().photos;
+    const photo = photos.find(p => p.id === photoId);
+    if (!photo) {
+      devError(`Photo not found: ${photoId}`);
+      return { success: false, error: 'Photo not found' };
+    }
+
+    try {
+      // 1. 尝试删除文件系统中的文件
+      if (photo.fileHandle) {
+        try {
+          // 使用 File System Access API 删除文件
+          await photo.fileHandle.remove();
+          devLog(`✓ 已从文件系统删除: ${photo.name}`);
+        } catch (fsError) {
+          // 如果没有删除权限，提示用户
+          devError('文件系统删除失败:', fsError);
+          return {
+            success: false,
+            error: '没有文件删除权限，请手动删除文件'
+          };
+        }
+      }
+
+      // 2. 从 photos 数组中移除
+      const updatedPhotos = photos.filter(p => p.id !== photoId);
+
+      // 3. 从 categories 中移除分类标记
+      const categories = { ...get().categories };
+      const photoKey = getPhotoKey(photo);
+      delete categories[photoKey];
+
+      // 4. 触发同步
+      const synced = syncState(updatedPhotos, categories);
+      set(synced);
+      saveCategories(synced.categories);
+
+      devLog(`✓ 已删除照片: ${photo.name}`);
+      return { success: true };
+    } catch (error) {
+      devError('删除照片失败:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
    * 清空照片列表
    */
   clearPhotos: () => {
