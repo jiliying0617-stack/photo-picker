@@ -664,10 +664,10 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
                 {/* 图片容器 - 可缩放和平移 */}
                 <div className="w-full h-full flex items-center justify-center relative">
-                  {/* 正方形容器确保旋转后尺寸一致 */}
-                  <div className="relative" style={{
-                    width: 'min(100%, 100vh)',
-                    height: 'min(100%, 100vh)',
+                  {/* 正方形容器 + cover 确保尺寸完全一致，可通过滚轮缩放查看完整图片 */}
+                  <div className="relative overflow-hidden" style={{
+                    width: 'min(90%, 90vh)',
+                    height: 'min(90%, 90vh)',
                     aspectRatio: '1/1'
                   }}>
                     {/* 相邻循环对比模式 - 叠图显示 */}
@@ -678,14 +678,13 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                           ref={el => imagesRef.current[idx] = el}
                           src={photo.thumbnailUrl}
                           alt={photo.name}
-                          className="absolute object-contain"
+                          className="absolute object-cover"
                           style={{
                             width: '100%',
                             height: '100%',
                             transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                             transformOrigin: 'center center',
                             willChange: isPanning ? 'transform' : 'auto',
-                            opacity: 1,
                             zIndex: 1,
                           }}
                           draggable={false}
@@ -695,14 +694,13 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         <img
                           src={nextPhoto.thumbnailUrl}
                           alt={nextPhoto.name}
-                          className="absolute object-contain"
+                          className="absolute object-cover"
                           style={{
                             width: '100%',
                             height: '100%',
                             transform: `rotate(${rotations[nextPhoto.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                             transformOrigin: 'center center',
                             willChange: isPanning ? 'transform' : 'auto',
-                            opacity: 1,
                             zIndex: 2,
                           }}
                           draggable={false}
@@ -719,7 +717,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         ref={el => imagesRef.current[idx] = el}
                         src={photo.thumbnailUrl}
                         alt={photo.name}
-                        className="object-contain"
+                        className="object-cover"
                         style={{
                           width: '100%',
                           height: '100%',
