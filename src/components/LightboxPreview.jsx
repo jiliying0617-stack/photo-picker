@@ -46,14 +46,28 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     return { photos: result };
   }, [photos, getPhotoUrl]);
 
+  // 🔥 性能优化：预计算照片ID到索引的映射，避免每次 findIndex
+  // 将查找复杂度从 O(n) 降低到 O(1)
+  const photoIndexMap = useMemo(() => {
+    if (!allPhotos) return new Map();
+
+    const map = new Map();
+    allPhotos.forEach((photo, index) => {
+      if (photo && photo.id) {
+        map.set(photo.id, index);
+      }
+    });
+    return map;
+  }, [allPhotos]);
+
   // 计算当前组在所有图片中的位置
   // 重要：allPhotos 已过滤占位符，按主面板顺序排列
   const photosPerGroup = photosWithUrls.photos.length;
   const firstRealPhoto = photosWithUrls.photos.find(p => p);
 
-  // 找到当前组第一张照片在 allPhotos 中的索引
-  const firstPhotoIndexInAll = allPhotos && firstRealPhoto
-    ? allPhotos.findIndex(p => p && p.id === firstRealPhoto.id)
+  // 🔥 使用 Map 快速查找索引（O(1) 复杂度）
+  const firstPhotoIndexInAll = firstRealPhoto && photoIndexMap.has(firstRealPhoto.id)
+    ? photoIndexMap.get(firstRealPhoto.id)
     : 0;
 
   // 计算当前组索引（按主面板顺序）
@@ -97,10 +111,10 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         continue;
       }
 
-      // 找到当前图片在 allPhotos 中的索引
-      const currentIndex = allPhotos.findIndex(p => p && p.id === currentPhoto.id);
+      // 🔥 使用 Map 快速查找索引（O(1) 复杂度）
+      const currentIndex = photoIndexMap.get(currentPhoto.id);
 
-      if (currentIndex === -1) {
+      if (currentIndex === undefined) {
         // 找不到，保持原样
         newPhotos.push(currentPhoto);
         continue;
@@ -119,7 +133,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     }
 
     onGroupChange(newPhotos);
-  }, [allPhotos, onGroupChange, photosPerGroup, photosWithUrls.photos]);
+  }, [allPhotos, onGroupChange, photosPerGroup, photosWithUrls.photos, photoIndexMap]);
 
   // 切换到下一组（下键：所有图片一起切换）
   // 重要：按主面板顺序切换，allPhotos 已过滤占位符
