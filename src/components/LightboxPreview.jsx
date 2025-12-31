@@ -672,7 +672,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         ref={el => imagesRef.current[idx] = el}
                         src={photo.thumbnailUrl}
                         alt={photo.name}
-                        className="absolute object-contain"
+                        className="absolute object-cover"
                         style={{
                           width: '100%',
                           height: '100%',
@@ -689,7 +689,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                       <img
                         src={nextPhoto.thumbnailUrl}
                         alt={nextPhoto.name}
-                        className="absolute object-contain"
+                        className="absolute object-cover"
                         style={{
                           width: '100%',
                           height: '100%',
@@ -713,7 +713,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                       ref={el => imagesRef.current[idx] = el}
                       src={photo.thumbnailUrl}
                       alt={photo.name}
-                      className="object-contain"
+                      className="object-cover"
                       style={{
                         width: '100%',
                         height: '100%',
