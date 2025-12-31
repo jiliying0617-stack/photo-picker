@@ -692,8 +692,10 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         ref={el => imagesRef.current[idx] = el}
                         src={photo.thumbnailUrl}
                         alt={photo.name}
-                        className="max-w-full max-h-full object-contain absolute"
+                        className="absolute object-contain"
                         style={{
+                          width: '100%',
+                          height: '100%',
                           transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                           transformOrigin: 'center center',
                           willChange: isPanning ? 'transform' : 'auto',
@@ -707,8 +709,10 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                       <img
                         src={nextPhoto.thumbnailUrl}
                         alt={nextPhoto.name}
-                        className="max-w-full max-h-full object-contain absolute"
+                        className="absolute object-contain"
                         style={{
+                          width: '100%',
+                          height: '100%',
                           transform: `rotate(${rotations[nextPhoto.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                           transformOrigin: 'center center',
                           willChange: isPanning ? 'transform' : 'auto',
@@ -729,8 +733,10 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                       ref={el => imagesRef.current[idx] = el}
                       src={photo.thumbnailUrl}
                       alt={photo.name}
-                      className="max-w-full max-h-full object-contain"
+                      className="object-contain"
                       style={{
+                        width: '100%',
+                        height: '100%',
                         transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                         transformOrigin: 'center center',
                         willChange: isPanning ? 'transform' : 'auto',
