@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
+import { useLRUObjectUrls } from '../hooks/useLRUObjectUrls';
 
 const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
   const [scale, setScale] = useState(1); // 图片缩放比例
@@ -11,48 +12,39 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   const [lastViewedPhotoId, setLastViewedPhotoId] = useState(null); // 追踪最后查看的照片ID
   const [copyPathNotification, setCopyPathNotification] = useState(false); // 复制路径成功提示
   const [hoveredPhotoId, setHoveredPhotoId] = useState(null); // 追踪鼠标悬停的图片ID
+  const [rotations, setRotations] = useState({}); // 存储每张图片的旋转角度 { photoId: degree }
   const setCategory = usePhotoStore((state) => state.setCategory);
   const setCategoryBatch = usePhotoStore((state) => state.setCategoryBatch); // 🔥 使用批量 API
   const storePhotos = usePhotoStore((state) => state.photos); // 获取实时分类状态
 
-  // 延迟创建所有照片的缩略图 URL (只在 Lightbox 打开时创建)
+  // 🔥 性能优化：使用 LRU 缓存管理 Object URLs
+  // 缓存最近使用的 500 张图片的 URLs（支持快速切换 125 组，每组 4 张）
+  const getPhotoUrl = useLRUObjectUrls(500);
+
+  // 按需创建照片 URL（LRU 缓存自动管理内存）
   const photosWithUrls = useMemo(() => {
-    const urls = [];
     const result = photos.map(photo => {
       // 处理占位符 (null)
       if (!photo) {
         return null;
       }
 
+      // 已有 thumbnailUrl，直接使用
       if (photo.thumbnailUrl) {
         return photo;
       }
+
+      // 从 LRU 缓存获取或创建 URL
       if (photo.file) {
-        const url = URL.createObjectURL(photo.file);
-        urls.push(url);
-        return {
-          ...photo,
-          thumbnailUrl: url
-        };
+        const url = getPhotoUrl(photo);
+        return url ? { ...photo, thumbnailUrl: url } : photo;
       }
+
       return photo;
     });
 
-    // 清理函数
-    return {
-      photos: result,
-      cleanup: () => urls.forEach(url => URL.revokeObjectURL(url))
-    };
-  }, [photos]);
-
-  // 组件卸载或 photos 改变时清理 URLs
-  useEffect(() => {
-    return () => {
-      if (photosWithUrls.cleanup) {
-        photosWithUrls.cleanup();
-      }
-    };
-  }, [photosWithUrls]);
+    return { photos: result };
+  }, [photos, getPhotoUrl]);
 
   // 计算当前组在所有图片中的位置
   // 重要：allPhotos 已过滤占位符，按主面板顺序排列
@@ -188,6 +180,23 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       handleCategoryAll(category);
     }
   }, [hoveredPhotoId, setCategory, handleCategoryAll]);
+
+  // 旋转图片：悬停在图片上时才能旋转
+  const handleRotate = useCallback((direction) => {
+    if (!hoveredPhotoId) return; // 只有悬停在图片上时才旋转
+
+    setRotations(prev => {
+      const currentRotation = prev[hoveredPhotoId] || 0;
+      const newRotation = direction === 'clockwise'
+        ? (currentRotation + 90) % 360
+        : (currentRotation - 90 + 360) % 360;
+
+      return {
+        ...prev,
+        [hoveredPhotoId]: newRotation
+      };
+    });
+  }, [hoveredPhotoId]);
 
   // 在访达中显示文件
   const handleShowInFinder = useCallback(async (photoId) => {
@@ -325,6 +334,12 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
         e.preventDefault();
         setScale(1);
         setPan({ x: 0, y: 0 });
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        handleRotate('counterclockwise'); // A键：逆时针旋转
+      } else if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault();
+        handleRotate('clockwise'); // B键：顺时针旋转
       } else if (e.key === 'q' || e.key === 'Q') {
         // Q键按下时已在keydown单独处理，这里不做处理
         e.preventDefault();
@@ -333,7 +348,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handleSpaceKey, handleNextGroup, handlePrevGroup, handleCategory, contextMenu, photosWithUrls.photos, lastViewedPhotoId]);
+  }, [onClose, handleSpaceKey, handleNextGroup, handlePrevGroup, handleCategory, handleRotate, contextMenu, photosWithUrls.photos, lastViewedPhotoId]);
 
   // Q键按住对比，松开恢复
   useEffect(() => {
@@ -644,7 +659,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         alt={photo.name}
                         className="max-w-full max-h-full object-contain absolute"
                         style={{
-                          transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                          transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                           transformOrigin: 'center center',
                           willChange: isPanning ? 'transform' : 'auto',
                           opacity: 1,
@@ -659,7 +674,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         alt={nextPhoto.name}
                         className="max-w-full max-h-full object-contain absolute"
                         style={{
-                          transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                          transform: `rotate(${rotations[nextPhoto.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                           transformOrigin: 'center center',
                           willChange: isPanning ? 'transform' : 'auto',
                           opacity: 1,
@@ -681,7 +696,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                       alt={photo.name}
                       className="max-w-full max-h-full object-contain"
                       style={{
-                        transform: `scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                        transform: `rotate(${rotations[photo.id] || 0}deg) scale(${scale}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
                         transformOrigin: 'center center',
                         willChange: isPanning ? 'transform' : 'auto',
                       }}
