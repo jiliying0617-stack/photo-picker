@@ -1,8 +1,33 @@
 import { memo, useRef, useEffect, useState, useCallback } from 'react';
 import { Grid } from 'react-window';
 import { getFileFormat, getFormatBadgeColor } from '../utils/imageUtils';
-import { useLRUObjectUrls } from '../hooks/useLRUObjectUrls';
+import { useLRUObjectUrls, usePhotoUrlLoader } from '../hooks/useLRUObjectUrls';
 import { LAYOUT, CACHE, CATEGORY_ICONS } from '../constants';
+
+/**
+ * 照片图片组件 - 处理异步加载
+ */
+function PhotoImage({ photo, getPhotoUrl, className, alt }) {
+  const url = usePhotoUrlLoader(photo, getPhotoUrl);
+
+  if (!url) {
+    // 加载中显示占位符
+    return (
+      <div className={`${className} flex items-center justify-center bg-gray-200`}>
+        <span className="text-gray-400 text-sm">加载中...</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt={alt}
+      loading="lazy"
+      className={className}
+    />
+  );
+}
 
 /**
  * 虚拟化照片网格组件
@@ -127,10 +152,6 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
     const fileFormat = getFileFormat(photo.name);
     const formatColors = getFormatBadgeColor(fileFormat);
 
-    // 按需获取照片URL（优先使用低分辨率缩略图，提升性能）
-    // getPhotoUrl 会优先返回 300px 缩略图，只在没有缩略图时返回完整图
-    const thumbnailUrl = photo.thumbnailUrl || getPhotoUrl(photo);
-
     return (
       <div style={style}>
         <div style={{ padding: gap / 2 }}>
@@ -162,10 +183,10 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
               className="relative group cursor-pointer"
             >
               <div className="aspect-square neu-concave rounded-xl overflow-hidden bg-gray-100">
-                <img
-                  src={thumbnailUrl}
+                <PhotoImage
+                  photo={photo}
+                  getPhotoUrl={getPhotoUrl}
                   alt={photo.name}
-                  loading="lazy"
                   className="w-full h-full object-contain"
                 />
               </div>

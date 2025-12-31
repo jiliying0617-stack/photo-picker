@@ -153,20 +153,26 @@ export async function importFolder(onProgress) {
         const entryPath = path ? `${path}/${entry.name}` : entry.name;
 
         if (entry.kind === 'file' && isImageFile(entry.name)) {
-          // 关键优化: 延迟加载 - 只存储句柄,不读取文件
-          // 先获取文件元数据(轻量级操作)
+          // 🔥 性能优化: 只存储 fileHandle,不加载文件到内存
+          // 只在需要显示时才通过 fileHandle.getFile() 创建 Object URL
+
+          // 获取元数据 (不加载文件内容,仅读取文件系统元信息)
           const file = await entry.getFile();
+          const metadata = {
+            size: file.size,
+            lastModified: file.lastModified,
+          };
 
           photos.push({
             id: crypto.randomUUID(),
             name: entry.name,
             path: entryPath,
-            file: file, // File 对象 (需要供 IndexedDB 读取)
-            fileHandle: entry, // FileHandle (备用)
+            file: null, // ✅ 不存储文件对象,节省内存
+            fileHandle: entry, // ✅ 只存储文件句柄 (轻量级)
             thumbnailUrl: null, // 延迟创建 (节省内存)
             category: null,
-            size: file.size,
-            lastModified: file.lastModified,
+            size: metadata.size,
+            lastModified: metadata.lastModified,
           });
 
           processedCount++;
