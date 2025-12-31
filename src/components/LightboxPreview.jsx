@@ -112,10 +112,16 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       const needsRotation = autoRotations[photo.id] === 90;
 
       if (needsRotation) {
-        // 旋转90度后，宽高互换，需要调整缩放比例以匹配第一张图
-        const rotatedRatio = dim.height / dim.width; // 旋转后的宽高比
-        // 计算缩放补偿：使旋转后的图片与第一张图在容器中占据相同视觉面积
-        scales[photo.id] = firstRatio / rotatedRatio;
+        // 旋转90度后，需要缩放补偿
+        // 关键: object-contain 在旋转前计算缩放，导致旋转后尺寸变小
+        // 例如: 横构图(4:3)在竖构图容器中，按宽度缩放到100%，高度只有75%
+        //      旋转后，75%的高度变成75%的宽度，看起来变小了
+        // 补偿: 需要放大 imageRatio 倍 (例如 4/3 = 1.33倍)
+        const imageRatio = dim.width / dim.height;
+
+        // 如果图片是横构图(ratio > 1)，缩放补偿 = ratio
+        // 如果图片是竖构图(ratio < 1)，缩放补偿 = 1/ratio
+        scales[photo.id] = imageRatio > 1 ? imageRatio : 1 / imageRatio;
       } else {
         // 不需要旋转，保持原始缩放
         scales[photo.id] = 1;
