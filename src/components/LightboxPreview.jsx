@@ -798,7 +798,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                           style={{
                             width: '100%',
                             height: '100%',
-                            transform: `rotate(${(autoRotations[photo.id] || 0) + (rotations[photo.id] || 0)}deg) scale(${scale * (scaleCompensation[photo.id] || 1)}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                            transform: `translate(${pan.x}px, ${pan.y}px) rotate(${(autoRotations[photo.id] || 0) + (rotations[photo.id] || 0)}deg) scale(${scale * (scaleCompensation[photo.id] || 1)})`,
                             transformOrigin: 'center center',
                             willChange: isPanning ? 'transform' : 'auto',
                             zIndex: 1,
@@ -815,7 +815,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                           style={{
                             width: '100%',
                             height: '100%',
-                            transform: `rotate(${(autoRotations[nextPhoto.id] || 0) + (rotations[nextPhoto.id] || 0)}deg) scale(${scale * (scaleCompensation[nextPhoto.id] || 1)}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                            transform: `translate(${pan.x}px, ${pan.y}px) rotate(${(autoRotations[nextPhoto.id] || 0) + (rotations[nextPhoto.id] || 0)}deg) scale(${scale * (scaleCompensation[nextPhoto.id] || 1)})`,
                             transformOrigin: 'center center',
                             willChange: isPanning ? 'transform' : 'auto',
                             zIndex: 2,
@@ -839,7 +839,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
                         style={{
                           width: '100%',
                           height: '100%',
-                          transform: `rotate(${(autoRotations[photo.id] || 0) + (rotations[photo.id] || 0)}deg) scale(${scale * (scaleCompensation[photo.id] || 1)}) translate(${pan.x / scale}px, ${pan.y / scale}px)`,
+                          transform: `translate(${pan.x}px, ${pan.y}px) rotate(${(autoRotations[photo.id] || 0) + (rotations[photo.id] || 0)}deg) scale(${scale * (scaleCompensation[photo.id] || 1)})`,
                           transformOrigin: 'center center',
                           willChange: isPanning ? 'transform' : 'auto',
                         }}
