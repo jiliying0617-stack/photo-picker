@@ -82,9 +82,11 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       const dim = imageDimensions[photo.id];
       const isVertical = dim.height > dim.width;
 
-      // 如果当前图片方向与第一张图不同，需要旋转90度
+      // 如果当前图片方向与第一张图不同，需要旋转
       if (isVertical !== firstIsVertical) {
-        rotations[photo.id] = 90; // 自动旋转90度以匹配第一张图的方向
+        // 逆时针旋转-90度(或顺时针270度)以匹配第一张图的方向
+        // 确保人物是正立的而不是倒置的
+        rotations[photo.id] = -90;
       } else {
         rotations[photo.id] = 0; // 方向一致，不需要自动旋转
       }
@@ -109,7 +111,7 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       if (!photo || !imageDimensions[photo.id]) return;
 
       const dim = imageDimensions[photo.id];
-      const needsRotation = autoRotations[photo.id] === 90;
+      const needsRotation = autoRotations[photo.id] !== 0; // 任何非0旋转都需要补偿
 
       if (needsRotation) {
         // 旋转90度后，需要缩放补偿
