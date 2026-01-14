@@ -52,19 +52,25 @@ const LightboxImageViewer = memo(function LightboxImageViewer({
 }) {
   return (
     <div className="flex-1 overflow-hidden">
-      <div
-        className="h-full grid gap-0"
-        style={{
-          gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
-        }}
-      >
+      <div className="h-full relative">
+        {/* 使用绝对定位替代Grid，彻底消除缝隙 */}
         {photos.map((photo, idx) => {
+          // 计算每个单元格的绝对位置（彻底消除Grid的gap问题）
+          const cellWidth = 100 / columnsCount; // 百分比宽度
+          const cellLeft = (idx % columnsCount) * cellWidth; // 列位置
+
           // 处理占位符（null）情况
           if (!photo) {
             return (
               <div
                 key={`placeholder-${idx}`}
-                className="relative bg-gray-900 overflow-hidden flex items-center justify-center"
+                className="absolute bg-gray-900 flex items-center justify-center"
+                style={{
+                  width: `${cellWidth}%`,
+                  height: '100%',
+                  left: `${cellLeft}%`,
+                  top: 0,
+                }}
               >
                 <div className="text-center">
                   <div className="text-6xl mb-3 opacity-20">📷</div>
@@ -101,8 +107,12 @@ const LightboxImageViewer = memo(function LightboxImageViewer({
           return (
             <div
               key={photo.id}
-              className="relative bg-black overflow-hidden"
+              className="absolute bg-black"
               style={{
+                width: `${cellWidth}%`,
+                height: '100%',
+                left: `${cellLeft}%`,
+                top: 0,
                 cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
               }}
               onClick={() => onPhotoClick(photo.id)}

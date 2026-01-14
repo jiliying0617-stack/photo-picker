@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState } from 'react';
 import usePhotoStore from './store/usePhotoStore';
 import Toolbar from './components/Toolbar';
 import StatusBar from './components/StatusBar';
@@ -8,6 +8,7 @@ import DragOverlay from './components/DragOverlay';
 import PhotoContextMenu from './components/PhotoContextMenu';
 import SelectionToolbar from './components/SelectionToolbar';
 import VirtualPhotoGrid from './components/VirtualPhotoGrid';
+import CompareModePanel from './components/CompareModePanel';
 import {
   usePhotoDisplay,
   usePhotoSelection,
@@ -18,10 +19,10 @@ import {
   usePhotoPreview,
   useToast,
   usePhotoRefs,
+  useGroupNavigation,
+  usePreviewCloseHandler,
 } from './hooks';
 import Toast from './components/Toast';
-import { devLog } from './utils/devLog';
-import { ANIMATION } from './constants';
 
 function App() {
   // Zustand store
@@ -82,111 +83,30 @@ function App() {
     previewPhotos, // 🔥 传递 previewPhotos，Lightbox 打开时禁用全局处理器
   });
 
-  // 计算总组数 - 基于第一个文件夹的图片数量
+  // 组导航逻辑
   const enableGroupNavigation = isCompareMode || groupBrowseMode;
-  const totalGroups = useMemo(() => {
-    if (!enableGroupNavigation) return 0;
+  const { totalGroups, scrollToGroup } = useGroupNavigation({
+    enableGroupNavigation,
+    folderMap,
+    displayPhotos,
+    compareColumns,
+    virtualGridRef,
+    setSelectedPhotoId,
+    scrollToPhoto,
+  });
 
-    // 获取第一个文件夹的图片数量
-    const folderPaths = Object.keys(folderMap).sort();
-    if (folderPaths.length === 0) return 0;
-
-    const firstFolderPath = folderPaths[0];
-    const firstFolderPhotos = folderMap[firstFolderPath] || [];
-    return firstFolderPhotos.length;
-  }, [enableGroupNavigation, folderMap]);
-
-  // 自动检索组跳转：根据输入的组号，找到第一个文件夹的第N张图片，并跳转到该图片在主列表中的位置
-  const scrollToGroup = useCallback(
-    (photoNumber) => {
-      // photoNumber 是用户输入的图片序号(从0开始)
-
-      if (!enableGroupNavigation) {
-        console.warn('⚠️ 组导航未启用');
-        return;
-      }
-
-      // 1. 获取第一个文件夹
-      const folderPaths = Object.keys(folderMap).sort();
-      if (folderPaths.length === 0) {
-        console.error('❌ 没有找到文件夹');
-        return;
-      }
-
-      const firstFolderPath = folderPaths[0];
-      const firstFolderPhotos = folderMap[firstFolderPath] || [];
-
-      devLog('📁 第一个文件夹:', firstFolderPath, '共', firstFolderPhotos.length, '张图片');
-
-      // 2. 检查图片序号是否有效
-      if (photoNumber < 0 || photoNumber >= firstFolderPhotos.length) {
-        console.warn('⚠️ 图片序号越界:', photoNumber + 1, '/', firstFolderPhotos.length);
-        alert(`第一个文件夹只有 ${firstFolderPhotos.length} 张图片，请输入 1-${firstFolderPhotos.length} 之间的数字`);
-        return;
-      }
-
-      // 3. 获取第N张图片
-      const targetPhoto = firstFolderPhotos[photoNumber];
-      if (!targetPhoto) {
-        console.error('❌ 未找到目标图片');
-        return;
-      }
-
-      devLog('🎯 目标图片:', targetPhoto.name, '(第一个文件夹的第', photoNumber + 1, '张)');
-
-      // 4. 在 displayPhotos 中找到该图片的索引
-      const photoIndexInDisplay = displayPhotos.findIndex(p => p && p.id === targetPhoto.id);
-      if (photoIndexInDisplay < 0) {
-        console.error('❌ 目标图片不在当前显示列表中(可能被过滤)');
-        alert(`图片 "${targetPhoto.name}" 不在当前显示列表中，可能被分类过滤隐藏了`);
-        return;
-      }
-
-      devLog('📍 图片在主列表中的位置:', photoIndexInDisplay + 1, '/', displayPhotos.length);
-
-      // 5. 滚动到该图片
-      if (!virtualGridRef) {
-        console.warn('⚠️ virtualGridRef 未初始化，稍后重试...');
-        setTimeout(() => scrollToGroup(photoNumber), 200);
-        return;
-      }
-
-      try {
-        if (typeof virtualGridRef.scrollToCell !== 'function') {
-          console.error('❌ scrollToCell 方法不存在');
-          return;
-        }
-
-        const rowIndex = Math.floor(photoIndexInDisplay / compareColumns);
-        const columnIndex = photoIndexInDisplay % compareColumns;
-
-        virtualGridRef.scrollToCell({
-          rowIndex,
-          columnIndex,
-          rowAlign: 'center',
-          columnAlign: 'center',
-          behavior: 'smooth',
-        });
-
-        devLog('✓ 滚动到行', rowIndex, '列', columnIndex);
-
-        // 选中该图片
-        setTimeout(() => {
-          setSelectedPhotoId(targetPhoto.id);
-          devLog('✓ 已选中图片:', targetPhoto.name);
-        }, 300);
-      } catch (error) {
-        console.error('❌ 滚动失败:', error);
-        // 回退方案
-        scrollToPhoto(targetPhoto.id, {
-          behavior: 'smooth',
-          block: 'center',
-        });
-      }
-    },
-    [enableGroupNavigation, folderMap, displayPhotos, compareColumns, virtualGridRef, setSelectedPhotoId, scrollToPhoto]
-  );
-
+  // 预览关闭处理
+  const handlePreviewClose = usePreviewCloseHandler({
+    enableGroupNavigation,
+    currentPreviewGroupIndex,
+    displayPhotos,
+    compareColumns,
+    virtualGridRef,
+    setSelectedPhotoId,
+    closePreview,
+    clearSelection,
+    scrollToGroup,
+  });
 
   // 检测是否有分类数据但缺少图片文件
   const hasDataButNoImages = photos.length > 0 && photos.every(p => !p.file && !p.thumbnailUrl);
@@ -244,20 +164,11 @@ function App() {
 
         {/* 主内容区 */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {isCompareMode && (
-            <div className="mx-4 mt-4 mb-2 neu-card p-4 rounded-xl flex-shrink-0">
-              <div className="text-center text-sm font-medium text-blue-600">
-                🔀 对比模式 · {compareColumns} 列对比 · 按文件名对齐
-              </div>
-              <div className="mt-2 flex gap-2 justify-center flex-wrap">
-                {selectedFolders.map((folder, idx) => (
-                  <div key={folder} className="text-xs px-3 py-1 neu-convex rounded-lg text-gray-600">
-                    列 {idx + 1}: {folder.split('/').pop()}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <CompareModePanel
+            isCompareMode={isCompareMode}
+            compareColumns={compareColumns}
+            selectedFolders={selectedFolders}
+          />
 
           {/* 虚拟滚动网格 */}
           <VirtualPhotoGrid
@@ -326,48 +237,7 @@ function App() {
         <LightboxPreview
           photos={previewPhotos}
           initialIndex={0}
-          onClose={(lastViewedPhotoId) => {
-            devLog('📥 App收到关闭请求，照片ID:', lastViewedPhotoId);
-
-            // 关闭预览并清除选择
-            closePreview();
-            clearSelection();
-
-            // 关闭预览后滚动到组的位置
-            if (enableGroupNavigation && currentPreviewGroupIndex >= 0) {
-              // 对比模式或分组浏览模式：滚动到组的位置
-              devLog('📍 关闭预览，跳转到组:', currentPreviewGroupIndex);
-              setTimeout(() => scrollToGroup(currentPreviewGroupIndex), ANIMATION.TRANSITION_DELAY);
-            } else if (lastViewedPhotoId) {
-              // 普通模式：滚动到具体照片
-              const finalPhoto = displayPhotos.find(p => p && p.id === lastViewedPhotoId);
-              if (finalPhoto) {
-                setTimeout(() => {
-                  const photoIndex = displayPhotos.findIndex(p => p && p.id === finalPhoto.id);
-
-                  if (photoIndex >= 0 && virtualGridRef?.scrollToCell) {
-                    const rowIndex = Math.floor(photoIndex / compareColumns);
-                    const columnIndex = photoIndex % compareColumns;
-
-                    devLog('📍 关闭预览，跳转到照片:', finalPhoto.id, '位置:', rowIndex, columnIndex);
-
-                    virtualGridRef.scrollToCell({
-                      rowIndex,
-                      columnIndex,
-                      rowAlign: 'center',
-                      columnAlign: 'center',
-                      behavior: 'smooth',
-                    });
-
-                    setTimeout(() => setSelectedPhotoId(finalPhoto.id), ANIMATION.SELECT_AFTER_SCROLL_DELAY);
-                  } else {
-                    // 备用方案：直接选中照片
-                    setSelectedPhotoId(finalPhoto.id);
-                  }
-                }, ANIMATION.TRANSITION_DELAY);
-              }
-            }
-          }}
+          onClose={handlePreviewClose}
           allPhotos={displayPhotos}
           onGroupChange={(newGroupPhotos) => {
             openPreview(newGroupPhotos);

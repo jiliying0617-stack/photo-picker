@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import usePhotoStore from '../store/usePhotoStore';
 import { useLRUObjectUrls } from '../hooks/useLRUObjectUrls';
+import { useLightboxKeyboard } from '../hooks/useLightboxKeyboard';
+import { usePhotoFileOperations } from '../hooks/usePhotoFileOperations';
+import LightboxContextMenu from './LightboxContextMenu';
+import CopyPathNotification from './CopyPathNotification';
 
 const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhotos, onGroupChange }) {
   const [scale, setScale] = useState(1); // 图片缩放比例
@@ -114,14 +118,6 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
   // 🎯 计算每张图片的缩放补偿，确保旋转后尺寸一致
   const scaleCompensation = useMemo(() => {
     const scales = {};
-
-    const firstPhoto = photosWithUrls.photos.find(p => p);
-    if (!firstPhoto || !imageDimensions[firstPhoto.id]) {
-      return scales;
-    }
-
-    const firstDim = imageDimensions[firstPhoto.id];
-    const firstRatio = firstDim.width / firstDim.height;
 
     photosWithUrls.photos.forEach(photo => {
       if (!photo || !imageDimensions[photo.id]) return;
@@ -348,193 +344,39 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
     }));
   }, []);
 
-  // 在访达中显示文件
-  const handleShowInFinder = useCallback(async (photoId) => {
-    const photo = photos.find(p => p && p.id === photoId);
-    if (!photo) return;
+  // 文件操作（提取到独立Hook）
+  const { handleShowInFinder, handleCopyPath } = usePhotoFileOperations(
+    photosWithUrls.photos,
+    setContextMenu,
+    setCopyPathNotification
+  );
 
-    try {
-      // 优先方案: 使用浏览器扩展（真正的系统级打开）
-      if (window.showInFinder && photo.path) {
-        try {
-          await window.showInFinder(photo.path);
-          console.log('✅ 已通过扩展在访达中打开:', photo.path);
-          setContextMenu(null);
-          return;
-        } catch (extError) {
-          console.warn('扩展调用失败，回退到下载方案:', extError.message);
-        }
-      }
+  // 包装函数：重置变换（缩放和平移）
+  const handleResetTransform = useCallback(() => {
+    setScale(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
 
-      // 回退方案1: 如果有 fileHandle，使用它来触发下载
-      if (photo.fileHandle) {
-        const file = await photo.fileHandle.getFile();
-        const url = URL.createObjectURL(file);
+  // 包装函数：切换对比模式
+  const handleCompareModeChange = useCallback((enabled) => {
+    setIsCompareMode(enabled);
+  }, []);
 
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.name;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 100);
-
-        console.log('📁 已触发下载，请在浏览器下载栏点击"在访达中显示"');
-        setContextMenu(null);
-      }
-      // 回退方案2: 如果有 file 对象
-      else if (photo.file) {
-        const url = URL.createObjectURL(photo.file);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = photo.file.name;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 100);
-
-        console.log('📁 已触发下载，请在浏览器下载栏点击"在访达中显示"');
-        setContextMenu(null);
-      }
-    } catch (error) {
-      console.error('操作失败:', error);
-    }
-  }, [photos]);
-
-  // 复制文件路径到剪贴板
-  const handleCopyPath = useCallback(async (photoId) => {
-    const photo = photos.find(p => p && p.id === photoId);
-    if (!photo) return;
-
-    try {
-      // 复制文件路径到剪贴板
-      await navigator.clipboard.writeText(photo.path);
-
-      // 显示成功提示
-      setCopyPathNotification(true);
-      setTimeout(() => setCopyPathNotification(false), 2000);
-
-      console.log('📋 已复制文件路径:', photo.path);
-    } catch (error) {
-      console.error('复制路径失败:', error);
-      // 降级方案：使用旧的复制方法
-      const textArea = document.createElement('textarea');
-      textArea.value = photo.path;
-      textArea.style.position = 'fixed';
-      textArea.style.left = '-999999px';
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        setCopyPathNotification(true);
-        setTimeout(() => setCopyPathNotification(false), 2000);
-      } catch (err) {
-        console.error('降级复制方法也失败:', err);
-      }
-      document.body.removeChild(textArea);
-    }
-  }, [photos]);
-
-  // 键盘快捷键
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (contextMenu) {
-          setContextMenu(null);
-        } else {
-          console.log('🚪 关闭预览，最后查看的照片ID:', lastViewedPhotoId);
-          onClose(lastViewedPhotoId);
-        }
-      } else if (e.key === ' ' || e.key === 'Spacebar') {
-        // 空格键：第一张图不动，其余图片切换下一组
-        e.preventDefault();
-        handleSpaceKey();
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        handlePrevGroup();
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        handleNextGroup();
-      } else if (e.key === '1') {
-        e.preventDefault();
-        e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
-        handleCategory('correct');
-      } else if (e.key === '2') {
-        e.preventDefault();
-        e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
-        handleCategory('medium');
-      } else if (e.key === '3') {
-        e.preventDefault();
-        e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
-        handleCategory('wrong');
-      } else if (e.key === '0' || e.key === 'x' || e.key === 'X') {
-        e.preventDefault();
-        e.stopPropagation(); // 🔥 阻止事件冒泡到全局处理器
-        handleCategory(null);
-      } else if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault();
-        setScale(1);
-        setPan({ x: 0, y: 0 });
-      } else if (e.key === 'a' || e.key === 'A') {
-        e.preventDefault();
-        handleRotate('counterclockwise'); // A键：逆时针旋转
-      } else if (e.key === 'b' || e.key === 'B') {
-        e.preventDefault();
-        handleRotate('clockwise'); // B键：顺时针旋转
-      } else if (e.key === 'q' || e.key === 'Q') {
-        // Q键按下时已在keydown单独处理，这里不做处理
-        e.preventDefault();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handleSpaceKey, handleNextGroup, handlePrevGroup, handleCategory, handleRotate, contextMenu, photosWithUrls.photos, lastViewedPhotoId]);
-
-  // Q键按住对比，松开恢复
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'q' || e.key === 'Q') {
-        if (e.repeat) return; // 忽略长按重复事件
-        e.preventDefault();
-
-        // 计算真实照片总数（过滤null）
-        const realPhotos = photosWithUrls.photos.filter(p => p);
-
-        if (realPhotos.length < 2) {
-          // 少于2张照片，无法对比
-          return;
-        }
-
-        // 按下Q：开启对比模式
-        setIsCompareMode(true);
-      }
-    };
-
-    const handleKeyUp = (e) => {
-      if (e.key === 'q' || e.key === 'Q') {
-        e.preventDefault();
-        // 松开Q：关闭对比模式
-        setIsCompareMode(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [photosWithUrls.photos]);
+  // 键盘快捷键处理（提取到独立Hook）
+  useLightboxKeyboard({
+    onClose,
+    onSpaceKey: handleSpaceKey,
+    onNextGroup: handleNextGroup,
+    onPrevGroup: handlePrevGroup,
+    onCategory: handleCategory,
+    onRotate: handleRotate,
+    onResetTransform: handleResetTransform,
+    onCompareModeChange: handleCompareModeChange,
+    contextMenu,
+    setContextMenu,
+    lastViewedPhotoId,
+    photosWithUrls,
+  });
 
   // 鼠标滚轮缩放
   useEffect(() => {
@@ -717,20 +559,26 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       </div>
 
       {/* 主预览区 - 固定框架,图片在框内缩放 */}
-      <div className="flex-1 overflow-hidden p-1">
-        <div
-          className="h-full grid gap-1"
-          style={{
-            gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
-          }}
-        >
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full relative">
+          {/* 使用绝对定位替代Grid，彻底消除缝隙 */}
           {photosWithUrls.photos.map((photo, idx) => {
+            // 计算每个单元格的绝对位置（彻底消除Grid的gap问题）
+            const cellWidth = 100 / columnsCount; // 百分比宽度
+            const cellLeft = (idx % columnsCount) * cellWidth; // 列位置
+
             // 处理占位符（null）情况
             if (!photo) {
               return (
                 <div
                   key={`placeholder-${idx}`}
-                  className="relative bg-gray-900 overflow-hidden flex items-center justify-center"
+                  className="absolute bg-gray-900 flex items-center justify-center"
+                  style={{
+                    width: `${cellWidth}%`,
+                    height: '100%',
+                    left: `${cellLeft}%`,
+                    top: 0,
+                  }}
                 >
                   <div className="text-center">
                     <div className="text-6xl mb-3 opacity-20">📷</div>
@@ -767,8 +615,12 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
             return (
               <div
                 key={photo.id}
-                className="relative bg-black overflow-hidden"
+                className="absolute bg-black"
                 style={{
+                  width: `${cellWidth}%`,
+                  height: '100%',
+                  left: `${cellLeft}%`,
+                  top: 0,
                   cursor: scale > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default',
                 }}
                 onClick={() => {
@@ -894,97 +746,16 @@ const LightboxPreview = memo(function LightboxPreview({ photos, onClose, allPhot
       </div>
 
       {/* 右键菜单 */}
-      {contextMenu && (
-        <div
-          className="fixed z-[70] bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-gray-700"
-          style={{
-            left: `${contextMenu.x}px`,
-            top: `${contextMenu.y}px`,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="py-2 min-w-[200px]">
-            <button
-              onClick={() => {
-                setCategory(contextMenu.photoId, 'correct');
-                setContextMenu(null);
-              }}
-              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
-            >
-              <span className="text-green-500 font-bold text-xl">✓</span>
-              <span className="text-white font-medium">正确</span>
-              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">1</span>
-            </button>
-            <button
-              onClick={() => {
-                setCategory(contextMenu.photoId, 'medium');
-                setContextMenu(null);
-              }}
-              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
-            >
-              <span className="text-yellow-500 font-bold text-xl">~</span>
-              <span className="text-white font-medium">中等</span>
-              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">2</span>
-            </button>
-            <button
-              onClick={() => {
-                setCategory(contextMenu.photoId, 'wrong');
-                setContextMenu(null);
-              }}
-              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
-            >
-              <span className="text-red-500 font-bold text-xl">✕</span>
-              <span className="text-white font-medium">错误</span>
-              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">3</span>
-            </button>
-            <div className="h-px bg-gray-700 my-1"></div>
-            <button
-              onClick={() => {
-                setCategory(contextMenu.photoId, null);
-                setContextMenu(null);
-              }}
-              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
-            >
-              <span className="text-gray-500 font-bold text-xl">○</span>
-              <span className="text-gray-400 font-medium">取消标签</span>
-              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">X</span>
-            </button>
-            <div className="h-px bg-gray-700 my-1"></div>
-            <button
-              onClick={() => {
-                handleShowInFinder(contextMenu.photoId);
-              }}
-              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
-            >
-              <span className="text-blue-400 font-bold text-xl">📁</span>
-              <span className="text-white font-medium">在访达中显示</span>
-              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">查看下载栏</span>
-            </button>
-            <button
-              onClick={() => {
-                handleCopyPath(contextMenu.photoId);
-                setContextMenu(null);
-              }}
-              className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors text-left"
-            >
-              <span className="text-blue-400 font-bold text-xl">📋</span>
-              <span className="text-white font-medium">复制文件路径</span>
-              <span className="ml-auto text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">Cmd+Shift+G</span>
-            </button>
-          </div>
-        </div>
-      )}
+      <LightboxContextMenu
+        contextMenu={contextMenu}
+        onCategory={setCategory}
+        onShowInFinder={handleShowInFinder}
+        onCopyPath={handleCopyPath}
+        onClose={() => setContextMenu(null)}
+      />
 
       {/* 复制路径成功提示 */}
-      {copyPathNotification && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[80] bg-green-600 text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-3 animate-fade-in">
-          <span className="text-2xl">✅</span>
-          <div>
-            <div className="font-bold">路径已复制到剪贴板</div>
-            <div className="text-sm opacity-90">在访达中按 Cmd+Shift+G 粘贴路径打开</div>
-          </div>
-        </div>
-      )}
+      <CopyPathNotification show={copyPathNotification} />
     </div>
   );
 });

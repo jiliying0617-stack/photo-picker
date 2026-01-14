@@ -5,6 +5,22 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: '/', // 生产环境使用根路径
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.js',
+    css: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/setupTests.js',
+        '**/*.test.{js,jsx}',
+        'dist/',
+      ],
+    },
+  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',

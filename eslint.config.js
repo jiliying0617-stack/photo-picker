@@ -39,4 +39,24 @@ export default defineConfig([
       },
     },
   },
+  // 测试文件专用配置 - 添加测试框架全局变量
+  {
+    files: ['**/*.test.{js,jsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,      // Node.js 环境变量
+        global: 'readonly',   // Node.js global 对象
+        vi: 'readonly',       // Vitest
+        describe: 'readonly', // Vitest/Jest
+        it: 'readonly',       // Vitest/Jest
+        test: 'readonly',     // Vitest/Jest
+        expect: 'readonly',   // Vitest/Jest
+        beforeEach: 'readonly', // Vitest/Jest
+        afterEach: 'readonly',  // Vitest/Jest
+        beforeAll: 'readonly',  // Vitest/Jest
+        afterAll: 'readonly',   // Vitest/Jest
+        require: 'readonly',    // CommonJS require
+      },
+    },
+  },
 ])

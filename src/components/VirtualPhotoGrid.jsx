@@ -1,5 +1,5 @@
 import { memo, useRef, useEffect, useState, useCallback } from 'react';
-import { Grid } from 'react-window';
+import { FixedSizeGrid } from 'react-window';
 import { getFileFormat, getFormatBadgeColor } from '../utils/imageUtils';
 import { useLRUObjectUrls, usePhotoUrlLoader } from '../hooks/useLRUObjectUrls';
 import { LAYOUT, CACHE, CATEGORY_ICONS } from '../constants';
@@ -304,21 +304,22 @@ const VirtualPhotoGrid = memo(function VirtualPhotoGrid({
 
   return (
     <div ref={containerRef} className="flex-1 overflow-hidden">
-      <Grid
-        gridRef={gridRef}
-        cellComponent={Cell}
-        cellProps={{}}
+      <FixedSizeGrid
+        ref={gridRef}
         columnCount={columns}
         columnWidth={columnWidth}
-        defaultHeight={containerSize.height}
-        defaultWidth={containerSize.width}
+        height={containerSize.height}
+        width={containerSize.width}
         rowCount={rowCount}
         rowHeight={rowHeight}
-        overscanCount={LAYOUT.OVERSCAN_COUNT}
+        overscanRowCount={LAYOUT.OVERSCAN_COUNT}
+        overscanColumnCount={LAYOUT.OVERSCAN_COUNT}
         onScroll={handleScroll}
         className="scrollbar-thin"
         style={{ padding: `${padding}px` }}
-      />
+      >
+        {Cell}
+      </FixedSizeGrid>
     </div>
   );
 });

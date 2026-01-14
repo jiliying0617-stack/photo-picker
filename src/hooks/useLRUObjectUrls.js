@@ -121,25 +121,22 @@ export function useLRUObjectUrls(maxSize = 200) {
  * @returns {string|null} URL 或 null
  */
 export function usePhotoUrlLoader(photo, getPhotoUrl) {
-  const [url, setUrl] = useState(() => {
-    // 初始化时优先返回缩略图
-    return photo?.thumbnailUrl || null;
-  });
+  // 存储异步加载的 URL（仅用于没有缩略图的情况）
+  const [loadedUrl, setLoadedUrl] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
-
-    // 优先使用预生成的缩略图
+    // 如果有缩略图，不需要异步加载
     if (photo?.thumbnailUrl) {
-      setUrl(photo.thumbnailUrl);
       return;
     }
 
+    let cancelled = false;
+
     // 异步加载 URL
     if (photo && getPhotoUrl) {
-      getPhotoUrl(photo).then(loadedUrl => {
-        if (!cancelled && loadedUrl) {
-          setUrl(loadedUrl);
+      getPhotoUrl(photo).then(url => {
+        if (!cancelled && url) {
+          setLoadedUrl(url);
         }
       });
     }
@@ -147,7 +144,8 @@ export function usePhotoUrlLoader(photo, getPhotoUrl) {
     return () => {
       cancelled = true;
     };
-  }, [photo?.id, photo?.thumbnailUrl, getPhotoUrl]);
+  }, [photo, getPhotoUrl]);
 
-  return url;
+  // 优先返回缩略图，否则返回异步加载的 URL
+  return photo?.thumbnailUrl || loadedUrl;
 }
